@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:16
+    container_name: ct_db
+    environment:
+      POSTGRES_USER: ct_user
+      POSTGRES_PASSWORD: ct_pass
+      POSTGRES_DB: ct_platform
+    ports:
+      - "5432:5432"
+    volumes:
+      - ct_db_data:/var/lib/postgresql/data
+
+volumes:
+  ct_db_data:
