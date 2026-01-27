@@ -1,23 +1,59 @@
-import { prisma } from "../db/prisma.js";
-import bcrypt from "bcrypt";
+const prisma = require("../db/prisma");
+const bcrypt = require("bcrypt");
 
-export async function createUser(req, res) {
-  const { email, password, role } = req.body;
+async function createUser(req, res) {
+  try {
+    const { email, password, role } = req.body;
 
-  const hash = await bcrypt.hash(password, 10);
+    if (!email || !password || !role) {
+      return res.status(400).json({ error: "email, password, role requis" });
+    }
 
-  const user = await prisma.user.create({
-    data: {
-      email,
-      password_hash: hash,
-      role,
-    },
-  });
+    const hash = await bcrypt.hash(password, 10);
 
-  res.json(user);
+    const user = await prisma.user.create({
+      data: {
+        email,
+        password_hash: hash,
+        role,
+      },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+      },
+    });
+
+    return res.status(201).json(user);
+  } catch (err) {
+    // Email déjà existant
+    if (err.code === "P2002") {
+      return res.status(409).json({ error: "Email déjà utilisé" });
+    }
+
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
 }
 
-export async function getUsers(req, res) {
-  const users = await prisma.user.findMany();
-  res.json(users);
+async function getUsers(req, res) {
+  try {
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+      },
+    });
+    return res.json(users);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
+  }
 }
+
+module.exports = { createUser, getUsers };
