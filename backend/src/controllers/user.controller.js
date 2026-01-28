@@ -1,59 +1,51 @@
 const prisma = require("../db/prisma");
 const bcrypt = require("bcrypt");
 
-async function createUser(req, res) {
-  try {
-    const { email, password, role } = req.body;
+// CREATE
+exports.createUser = async (req, res) => {
+  const { email, password, role } = req.body;
+  const hash = await bcrypt.hash(password, 10);
 
-    if (!email || !password || !role) {
-      return res.status(400).json({ error: "email, password, role requis" });
-    }
+  const user = await prisma.user.create({
+    data: { email, password_hash: hash, role },
+  });
 
-    const hash = await bcrypt.hash(password, 10);
+  res.status(201).json({
+    id: user.id,
+    email: user.email,
+    role: user.role,
+    createdAt: user.createdAt,
+  });
+};
 
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password_hash: hash,
-        role,
-      },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        isActive: true,
-        createdAt: true,
-      },
-    });
+// READ ALL
+exports.getUsers = async (req, res) => {
+  const users = await prisma.user.findMany({
+    select: { id: true, email: true, role: true, createdAt: true },
+  });
+  res.json(users);
+};
 
-    return res.status(201).json(user);
-  } catch (err) {
-    // Email déjà existant
-    if (err.code === "P2002") {
-      return res.status(409).json({ error: "Email déjà utilisé" });
-    }
+// READ ONE
+exports.getUserById = async (req, res) => {
+  const user = await prisma.user.findUnique({
+    where: { id: req.params.id },
+  });
+  if (!user) return res.sendStatus(404);
+  res.json(user);
+};
 
-    console.error(err);
-    return res.status(500).json({ error: "Server error" });
-  }
-}
+// UPDATE
+exports.updateUser = async (req, res) => {
+  const user = await prisma.user.update({
+    where: { id: req.params.id },
+    data: req.body,
+  });
+  res.json(user);
+};
 
-async function getUsers(req, res) {
-  try {
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        isActive: true,
-        createdAt: true,
-      },
-    });
-    return res.json(users);
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "Server error" });
-  }
-}
-
-module.exports = { createUser, getUsers };
+// DELETE
+exports.deleteUser = async (req, res) => {
+  await prisma.user.delete({ where: { id: req.params.id } });
+  res.sendStatus(204);
+};

@@ -1,18 +1,17 @@
 require("dotenv").config();
-const app = require("./src/app");
+const express = require("express");
+const cors = require("cors");
 
-const prisma = require("./src/db/prisma");
+const userRoutes = require("./src/routes/user.routes");
+const authRoutes = require("./src/routes/auth.routes");
 
-app.get("/health-db", async (req, res) => {
-  try {
-    const count = await prisma.user.count();
-    res.json({ status: "ok", users: count });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "DB error" });
-  }
-});
+const app = express();
+app.use(cors());
+app.use(express.json());
 
-app.listen(4000, () => {
-  console.log("Backend running on http://localhost:4000");
-});
+app.use("/users", userRoutes);
+app.use("/auth", authRoutes);
+
+app.get("/health", (req, res) => res.json({ status: "ok" }));
+
+app.listen(4000, () => console.log("Backend running on http://localhost:4000"));
