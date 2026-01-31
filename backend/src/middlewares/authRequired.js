@@ -1,8 +1,8 @@
-import jwt from "jsonwebtoken";
+const jwt = require("jsonwebtoken");
 
-export function authRequired(req, res, next) {
+function authRequired(req, res, next) {
   const header = req.headers.authorization;
-  if (!header?.startsWith("Bearer ")) {
+  if (!header || !header.startsWith("Bearer ")) {
     return res.status(401).json({ error: "missing token" });
   }
 
@@ -10,9 +10,12 @@ export function authRequired(req, res, next) {
 
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
-    req.auth = { userId: payload.sub, role: payload.role };
+    const userId = payload.sub || payload.id; // compat avec votre login actuel
+    req.auth = { userId, role: payload.role };
     return next();
   } catch {
     return res.status(401).json({ error: "invalid token" });
   }
 }
+
+module.exports = { authRequired };

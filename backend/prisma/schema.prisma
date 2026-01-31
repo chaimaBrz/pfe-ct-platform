@@ -12,6 +12,11 @@ enum Role {
   OBSERVER
 }
 
+enum PassFail {
+  PASS
+  FAIL
+}
+
 model User {
   id            String   @id @default(uuid())
   email         String   @unique
@@ -19,5 +24,21 @@ model User {
   role          Role
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
+
+  visionTests   VisionTestResult[]
 }
 
+model VisionTestResult {
+  id            String   @id @default(uuid())
+  userId        String
+  ishiharaScore Int
+  ishiharaTotal Int
+  contrastScore Float
+  status        PassFail
+  testedAt      DateTime @default(now())
+  details       Json?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, testedAt])
+}

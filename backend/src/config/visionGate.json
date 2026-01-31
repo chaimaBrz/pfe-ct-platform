@@ -1,0 +1,9 @@
+{
+  "ishihara": {
+    "mode": "ratio",
+    "minRatio": 0.85,
+    "minCorrect": null,
+    "maxErrors": null
+  },
+  "contrast": { "minScore": 0.5 }
+}
