@@ -26,6 +26,8 @@ model User {
   createdAt     DateTime @default(now())
 
   visionTests   VisionTestResult[]
+    sessions Session[]
+
 }
 
 model VisionTestResult {
@@ -42,3 +44,98 @@ model VisionTestResult {
 
   @@index([userId, testedAt])
 }
+
+enum StudyType {
+  QUALITY
+  DETECTABILITY
+}
+
+enum EvalMode {
+  PAIRWISE
+  RATING
+}
+
+enum SessionStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABORTED
+}
+
+enum PairChoice {
+  LEFT_BETTER
+  RIGHT_BETTER
+  EQUAL
+}
+
+
+model Protocol {
+  id             String   @id @default(uuid())
+  name           String
+  studyType      StudyType
+  mode           EvalMode
+  parametersJson Json?
+  createdAt      DateTime @default(now())
+
+  studies        Study[]
+}
+
+model Study {
+  id        String   @id @default(uuid())
+  name      String
+  studyType StudyType
+  status    String   @default("DRAFT") // DRAFT / RUNNING / CLOSED
+  createdAt DateTime @default(now())
+
+  protocolId String
+  protocol   Protocol @relation(fields: [protocolId], references: [id])
+
+  sessions   Session[]
+  pairwiseTasks PairwiseTask[]
+}
+
+model Session {
+  id        String        @id @default(uuid())
+  status    SessionStatus @default(IN_PROGRESS)
+  startedAt DateTime      @default(now())
+  endedAt   DateTime?
+  displayProfileJson Json?
+
+  studyId String
+   study   Study @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  
+
+
+  userId String
+  user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  pairwiseEvaluations PairwiseEvaluation[]
+}
+
+model PairwiseTask {
+  id           String   @id @default(uuid())
+  studyId      String
+    study   Study @relation(fields: [studyId], references: [id], onDelete: Cascade)
+
+
+  leftImageId  String
+  rightImageId String
+
+  randomSeed   String?
+  createdAt    DateTime @default(now())
+
+  evaluations  PairwiseEvaluation[]
+}
+
+model PairwiseEvaluation {
+  id            String     @id @default(uuid())
+  sessionId     String
+  session       Session    @relation(fields: [sessionId], references: [id])
+
+  taskId        String
+  task          PairwiseTask @relation(fields: [taskId], references: [id])
+
+  choice        PairChoice
+  responseTimeMs Int?
+  createdAt     DateTime @default(now())
+}
+
