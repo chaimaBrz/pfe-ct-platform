@@ -1,0 +1,68 @@
+.pv-shell {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 24px;
+}
+
+.pv-card {
+  width: 520px;
+  max-width: 92vw;
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
+.pv-image img {
+  width: 100%;
+  border-radius: 12px;
+  margin: 12px 0;
+}
+
+.pv-options {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.pv-btn {
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #ddd;
+  background: #f6f7fb;
+  cursor: pointer;
+}
+
+.pv-btn:hover {
+  background: #eef1ff;
+}
+
+.pv-result {
+  padding: 12px;
+  border-radius: 10px;
+  font-weight: 700;
+  margin: 12px 0;
+}
+
+.pv-result.ok {
+  background: #e8fff0;
+  color: #1b7f3a;
+}
+.pv-result.ko {
+  background: #ffecec;
+  color: #b42318;
+}
+
+.pv-btn.success {
+  width: 100%;
+  background: #2563eb;
+  color: white;
+  border: none;
+}
+
+.pv-btn.ghost {
+  width: 100%;
+  background: transparent;
+}
