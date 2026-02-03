@@ -7,6 +7,9 @@ const visionRoutes = require("./src/routes/vision.routes");
 const protocolRoutes = require("./src/routes/protocol.routes");
 const studyRoutes = require("./src/routes/study.routes");
 const sessionRoutes = require("./src/routes/session.routes");
+const imageRoutes = require("./src/routes/image.routes");
+const pairwiseRoutes = require("./src/routes/pairwise.routes");
+const publicRoutes = require("./src/routes/public.routes");
 
 const app = express();
 app.use(cors());
@@ -20,5 +23,8 @@ app.use("/vision", visionRoutes);
 app.use("/protocols", protocolRoutes);
 app.use("/studies", studyRoutes);
 app.use("/sessions", sessionRoutes);
+app.use("/images", imageRoutes);
+app.use("/pairwise", pairwiseRoutes);
+app.use("/public", publicRoutes);
 
 module.exports = app;

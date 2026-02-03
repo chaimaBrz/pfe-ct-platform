@@ -6,43 +6,14 @@ datasource db {
   provider = "postgresql"
 }
 
-
 enum Role {
   ADMIN
-  OBSERVER
+  OBSERVER // tu peux le garder pour compat, mais il ne sera plus utilisé côté expert
 }
 
 enum PassFail {
   PASS
   FAIL
-}
-
-model User {
-  id            String   @id @default(uuid())
-  email         String   @unique
-  password_hash String
-  role          Role
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-
-  visionTests   VisionTestResult[]
-    sessions Session[]
-
-}
-
-model VisionTestResult {
-  id            String   @id @default(uuid())
-  userId        String
-  ishiharaScore Int
-  ishiharaTotal Int
-  contrastScore Float
-  status        PassFail
-  testedAt      DateTime @default(now())
-  details       Json?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, testedAt])
 }
 
 enum StudyType {
@@ -67,30 +38,96 @@ enum PairChoice {
   EQUAL
 }
 
+enum ExpertiseType {
+  RADIOLOGY
+  IMAGE_QUALITY
+  OTHER
+}
+
+enum RadiologySpecialty {
+  CHEST
+  ABDOMINAL
+  MSK
+  EMERGENCY
+  ONCOLOGY
+  PEDIATRIC
+  NEURORADIOLOGY
+  OTHER
+}
+
+enum ImageFormat {
+  DICOM
+  IMA
+  NIFTI_GZ
+  PNG
+  JPEG
+  OTHER
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  password_hash String
+  role          Role
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  sessions Session[]
+}
+
+model ObserverProfile {
+  id              String              @id @default(uuid())
+  firstName       String
+  lastName        String
+  age             Int?
+  expertiseType   ExpertiseType
+  specialty       RadiologySpecialty?
+  experienceYears Int?
+  consentAccepted Boolean             @default(false)
+  createdAt       DateTime            @default(now())
+
+  sessions Session[]
+}
 
 model Protocol {
-  id             String   @id @default(uuid())
+  id             String    @id @default(uuid())
   name           String
   studyType      StudyType
   mode           EvalMode
   parametersJson Json?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime  @default(now())
 
-  studies        Study[]
+  studies Study[]
 }
 
 model Study {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   name      String
   studyType StudyType
-  status    String   @default("DRAFT") // DRAFT / RUNNING / CLOSED
-  createdAt DateTime @default(now())
+  status    String    @default("DRAFT") // DRAFT / RUNNING / CLOSED
+  createdAt DateTime  @default(now())
 
   protocolId String
   protocol   Protocol @relation(fields: [protocolId], references: [id])
 
-  sessions   Session[]
+  sessions      Session[]
+  invitations   StudyInvitation[]
   pairwiseTasks PairwiseTask[]
+  studyImages   StudyImage[]
+}
+
+model StudyInvitation {
+  id      String @id @default(uuid())
+  token   String @unique
+  studyId String
+  study   Study  @relation(fields: [studyId], references: [id], onDelete: Cascade)
+
+  expiresAt DateTime?
+  maxUses   Int?
+  usedCount Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  sessions Session[]
 }
 
 model Session {
@@ -98,44 +135,102 @@ model Session {
   status    SessionStatus @default(IN_PROGRESS)
   startedAt DateTime      @default(now())
   endedAt   DateTime?
+
+  // legacy: si tu veux garder temporairement un JSON “profil affiché”
   displayProfileJson Json?
 
   studyId String
-   study   Study @relation(fields: [studyId], references: [id], onDelete: Cascade)
-  
+  study   Study  @relation(fields: [studyId], references: [id], onDelete: Cascade)
 
+  // Admin (optionnel)
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
 
-  userId String
-  user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Observer (optionnel mais en pratique requis pour une session publique)
+  observerId String?
+  observer   ObserverProfile? @relation(fields: [observerId], references: [id], onDelete: Cascade)
 
+  // Invitation (token) utilisée
+  invitationId String?
+  invitation   StudyInvitation? @relation(fields: [invitationId], references: [id])
+
+  visionTests         VisionTestResult[]
   pairwiseEvaluations PairwiseEvaluation[]
 }
 
-model PairwiseTask {
-  id           String   @id @default(uuid())
-  studyId      String
-    study   Study @relation(fields: [studyId], references: [id], onDelete: Cascade)
+model VisionTestResult {
+  id        String @id @default(uuid())
+  sessionId String
 
+  ishiharaScore Int
+  ishiharaTotal Int
+  contrastScore Float
+  status        PassFail
+  testedAt      DateTime @default(now())
+  details       Json?
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, testedAt])
+}
+
+model ImageAsset {
+  id           String      @id @default(uuid())
+  label        String? // ex: "X1", "case_001", etc.
+  uri          String // chemin fichier, URL, ou clé storage
+  format       ImageFormat
+  metadataJson Json?
+  createdAt    DateTime    @default(now())
+
+  // relations inverses (facultatif mais pratique)
+  asLeftInTasks  PairwiseTask[] @relation("LeftImage")
+  asRightInTasks PairwiseTask[] @relation("RightImage")
+  studyImages    StudyImage[]
+}
+
+model StudyImage {
+  id      String   @id @default(uuid())
+  studyId String
+  imageId String
+  addedAt DateTime @default(now())
+
+  study Study      @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  image ImageAsset @relation(fields: [imageId], references: [id], onDelete: Cascade)
+
+  @@unique([studyId, imageId])
+  @@index([studyId])
+  @@index([imageId])
+}
+
+model PairwiseTask {
+  id      String @id @default(uuid())
+  studyId String
+  study   Study  @relation(fields: [studyId], references: [id], onDelete: Cascade)
 
   leftImageId  String
   rightImageId String
 
-  randomSeed   String?
-  createdAt    DateTime @default(now())
+  leftImage  ImageAsset @relation("LeftImage", fields: [leftImageId], references: [id])
+  rightImage ImageAsset @relation("RightImage", fields: [rightImageId], references: [id])
 
-  evaluations  PairwiseEvaluation[]
+  randomSeed String?
+  createdAt  DateTime @default(now())
+
+  evaluations PairwiseEvaluation[]
 }
 
 model PairwiseEvaluation {
-  id            String     @id @default(uuid())
-  sessionId     String
-  session       Session    @relation(fields: [sessionId], references: [id])
+  id        String  @id @default(uuid())
+  sessionId String
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
-  taskId        String
-  task          PairwiseTask @relation(fields: [taskId], references: [id])
+  taskId String
+  task   PairwiseTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
-  choice        PairChoice
+  choice         PairChoice
   responseTimeMs Int?
-  createdAt     DateTime @default(now())
-}
+  createdAt      DateTime   @default(now())
 
+  @@index([sessionId, createdAt])
+  @@index([taskId, createdAt])
+}
