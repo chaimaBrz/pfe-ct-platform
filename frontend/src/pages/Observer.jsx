@@ -1,51 +1,84 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import LogoutButton from "../components/LogoutButton";
+import { apiFetch } from "../lib/api";
 import "./Observer.css";
 
 export default function Observer() {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
 
+  // 1) Infos user depuis JWT (id, role)
   const user = useMemo(() => {
     if (!token) return null;
     try {
-      return jwtDecode(token);
+      return jwtDecode(token); // { id, role, exp, iat, ... }
     } catch {
       return null;
     }
   }, [token]);
 
-  // ✅ règle du PDF : accès bloqué tant que non validé
-  const validated = localStorage.getItem("observer_validated") === "true";
+  // 2) Statut vision depuis backend: PASS / FAIL / PENDING
+  const [visionStatus, setVisionStatus] = useState("PENDING");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // si pas de token -> retour login
+    if (!token) {
+      navigate("/login", { replace: true });
+      return;
+    }
+
+    (async () => {
+      try {
+        setLoading(true);
+        const data = await apiFetch("/vision/status"); // attendu: { status: "PASS"|"FAIL"|"PENDING" }
+        const status = data?.status || "PENDING";
+        setVisionStatus(status);
+
+        // optionnel: garder aussi un bool pour d'autres pages
+        localStorage.setItem(
+          "observer_validated",
+          status === "PASS" ? "true" : "false",
+        );
+      } catch {
+        // Si token invalide/expiré ou serveur down
+        setVisionStatus("PENDING");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [token, navigate]);
+
+  const validated = visionStatus === "PASS";
 
   const cards = [
     {
       title: "Pré-validation observateur",
       desc: "Tests obligatoires : Ishihara (couleurs) + sensibilité au contraste.",
-      status: validated ? "Validé" : "Obligatoire",
+      status: loading ? "Chargement..." : validated ? "Validé" : "Obligatoire",
       locked: false,
       path: "/observer/pre-validation",
     },
     {
       title: "Évaluation de la qualité d’image",
       desc: "Deux modes : comparaison par paires (ITU) + notation Likert (1–5).",
-      status: validated ? "Disponible" : "Bloqué",
+      status: loading ? "—" : validated ? "Disponible" : "Bloqué",
       locked: !validated,
       path: "/observer/quality",
     },
     {
       title: "Visibilité & détectabilité",
       desc: "Détectabilité (fond uniforme), symétrie perceptive, tumeurs simulées.",
-      status: validated ? "Disponible" : "Bloqué",
+      status: loading ? "—" : validated ? "Disponible" : "Bloqué",
       locked: !validated,
       path: "/observer/detectability",
     },
   ];
 
   const go = (path, locked) => {
-    if (locked) return;
+    if (locked || loading) return;
     navigate(path);
   };
 
@@ -70,7 +103,11 @@ export default function Observer() {
             <div className="obs-user-line">
               <span className="k">Statut:</span>{" "}
               <span className={`v ${validated ? "ok" : "ko"}`}>
-                {validated ? "VALIDÉ" : "NON VALIDÉ"}
+                {loading
+                  ? "CHARGEMENT..."
+                  : validated
+                    ? "VALIDÉ"
+                    : "NON VALIDÉ"}
               </span>
             </div>
           </div>
@@ -104,18 +141,25 @@ export default function Observer() {
               <p className="obs-card-desc">{c.desc}</p>
 
               <button
-                className={`obs-btn ${c.locked ? "btn-locked" : ""}`}
+                className={`obs-btn ${c.locked || loading ? "btn-locked" : ""}`}
                 onClick={() => go(c.path, c.locked)}
+                disabled={c.locked || loading}
                 title={
-                  c.locked
-                    ? "Terminez la pré-validation pour débloquer"
-                    : "Ouvrir"
+                  loading
+                    ? "Chargement du statut..."
+                    : c.locked
+                      ? "Terminez la pré-validation pour débloquer"
+                      : "Ouvrir"
                 }
               >
-                {c.locked ? "Verrouillé" : "Commencer"}
+                {loading
+                  ? "Chargement..."
+                  : c.locked
+                    ? "Verrouillé"
+                    : "Commencer"}
               </button>
 
-              {c.locked && (
+              {c.locked && !loading && (
                 <div className="obs-hint">
                   Débloquez en terminant la <b>pré-validation</b>.
                 </div>

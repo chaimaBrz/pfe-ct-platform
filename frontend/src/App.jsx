@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import Login from "./pages/Login";
+import Login from "./pages/Login"; // IMPORTANT: c'est CE fichier qu'on doit vérifier
 import Admin from "./pages/Admin";
 import Observer from "./pages/Observer.jsx";
 import ProtectedRoute from "./routes/ProtectedRoute";
@@ -22,14 +22,6 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/observer/pre-validation"
-          element={
-            <ProtectedRoute allow={["OBSERVER", "ADMIN"]}>
-              <PreValidation />
-            </ProtectedRoute>
-          }
-        />
 
         <Route
           path="/observer"
@@ -39,6 +31,7 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/observer/pre-validation"
           element={
