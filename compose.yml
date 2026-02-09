@@ -11,5 +11,15 @@ services:
     volumes:
       - ct_db_data:/var/lib/postgresql/data
 
+  orthanc:
+    image: orthancteam/orthanc:latest
+    container_name: ct_orthanc
+    ports:
+      - "8042:8042"
+    volumes:
+      - ./backend/orthanc/orthanc.json:/etc/orthanc/orthanc.json:ro
+      - ct_orthanc_data:/var/lib/orthanc/db
+
 volumes:
   ct_db_data:
+  ct_orthanc_data:

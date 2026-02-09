@@ -1,0 +1,17 @@
+{
+  "Name": "CT-Orthanc",
+  "HttpServerEnabled": true,
+  "HttpPort": 8042,
+
+  "AuthenticationEnabled": true,
+  "RegisteredUsers": {
+    "admin": "admin"
+  },
+
+  "RemoteAccessAllowed": true,
+
+  "DicomWeb": {
+    "Enable": true,
+    "Root": "/dicom-web/"
+  }
+}

@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
 
 const userRoutes = require("./src/routes/user.routes");
 const authRoutes = require("./src/routes/auth.routes");
@@ -14,6 +15,9 @@ const publicRoutes = require("./src/routes/public.routes");
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// ✅ static
+app.use("/demo", express.static(path.join(__dirname, "demo")));
 
 app.get("/health", (req, res) => res.json({ status: "ok" }));
 
