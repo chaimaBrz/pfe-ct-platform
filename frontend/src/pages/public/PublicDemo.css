@@ -1,0 +1,134 @@
+/* Page background */
+.demo-page {
+  min-height: 100vh;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 20% 10%, #e9f0ff, transparent 45%),
+    radial-gradient(circle at 80% 30%, #f3eaff, transparent 55%), #f7f8fb;
+  box-sizing: border-box;
+}
+
+/* Top bar */
+.demo-topbar {
+  max-width: 1120px;
+  margin: 0 auto 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.demo-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.demo-logo {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #2f6bff, #1f55ff);
+  color: white;
+  font-weight: 900;
+  display: grid;
+  place-items: center;
+}
+
+.demo-brandTitle {
+  font-weight: 800;
+}
+
+.demo-brandSub {
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+/* Pills */
+.demo-pills {
+  display: flex;
+  gap: 10px;
+}
+
+.demo-pill {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Main content */
+.demo-container {
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.demo-title {
+  font-size: 44px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  margin-bottom: 6px;
+}
+
+.demo-subtitle {
+  margin-bottom: 18px;
+  opacity: 0.75;
+}
+
+/* Card */
+.demo-card {
+  background: rgba(255, 255, 255, 0.75);
+  border-radius: 22px;
+  padding: 18px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.1);
+}
+
+.demo-video {
+  width: 100%;
+  border-radius: 16px;
+  background: black;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+/* Tip */
+.demo-tip {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(47, 107, 255, 0.08);
+  border: 1px solid rgba(47, 107, 255, 0.18);
+  font-size: 14px;
+}
+
+/* Actions */
+.demo-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 18px;
+}
+
+.demo-btn {
+  padding: 12px 18px;
+  border-radius: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: white;
+}
+
+.demo-btnPrimary {
+  background: linear-gradient(180deg, #2f6bff, #1f55ff);
+  color: white;
+  border: none;
+  min-width: 140px;
+  box-shadow: 0 10px 26px rgba(31, 85, 255, 0.25);
+}
+
+/* Footer */
+.demo-footer {
+  margin-top: 18px;
+  font-size: 12px;
+  opacity: 0.6;
+}

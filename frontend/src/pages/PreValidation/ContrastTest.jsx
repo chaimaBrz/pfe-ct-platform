@@ -1,167 +1,148 @@
-import { useEffect, useMemo, useState } from "react";
-import "./PreValidation.css";
-import { buildContrastTrials, pickRandomPack } from "./contrastStimuli";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-/**
- * ContrastTest (front-only)
- * - Randomly picks one "test pack" each new session
- * - Generates randomized trials
- * - Saves results discreetly (no score shown)
- */
-export default function ContrastTest({ onDone }) {
-  // ✅ Freeze the session pack + trials in localStorage to avoid changing on refresh
-  const storageKey = "contrast_session_v1";
+// Non-ambiguous letters
+const LETTERS = ["C", "E", "F", "L", "P", "T", "U", "V", "H"];
 
-  const session = useMemo(() => {
-    const saved = localStorage.getItem(storageKey);
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        // ignore
-      }
+const ORIENTATIONS = [
+  { label: "Up", value: 0 },
+  { label: "Right", value: 90 },
+  { label: "Down", value: 180 },
+  { label: "Left", value: 270 },
+];
+
+// Helpers
+function pickRandom(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function randomLevel(min = 1, max = 12) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+// level 1 = very visible, level 12 = barely visible
+function levelToGray(level) {
+  const min = 35; // dark (easy)
+  const max = 235; // light (hard)
+  return Math.round(min + (level - 1) * ((max - min) / 11));
+}
+
+export default function ContrastTest({ totalRounds = 16, onDone }) {
+  const [round, setRound] = useState(1);
+  const [correct, setCorrect] = useState(0);
+
+  const [letter, setLetter] = useState(() => pickRandom(LETTERS));
+  const [orientation, setOrientation] = useState(
+    () => pickRandom(ORIENTATIONS).value,
+  );
+  const [level, setLevel] = useState(() => randomLevel(1, 12));
+
+  const bestLevelRef = useRef(1);
+
+  const gray = useMemo(() => levelToGray(level), [level]);
+
+  function nextQuestion() {
+    setLetter(pickRandom(LETTERS)); // random letter
+    setOrientation(pickRandom(ORIENTATIONS).value); // random orientation
+    setLevel(randomLevel(1, 12)); // random contrast
+  }
+
+  function finishTest(nextCorrect) {
+    // Score between 0 and 1
+    const contrastScore = Number((nextCorrect / totalRounds).toFixed(4));
+    onDone?.({ contrastScore });
+  }
+
+  function answer(userOrientation) {
+    const isCorrect = userOrientation === orientation;
+    const nextCorrect = isCorrect ? correct + 1 : correct;
+
+    if (isCorrect) {
+      setCorrect(nextCorrect);
+      bestLevelRef.current = Math.max(bestLevelRef.current, level);
     }
 
-    const pack = pickRandomPack();
-    const trials = buildContrastTrials(pack, 14);
-    const fresh = {
-      sessionId: crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()),
-      createdAt: new Date().toISOString(),
-      pack,
-      trials,
-    };
-
-    localStorage.setItem(storageKey, JSON.stringify(fresh));
-    return fresh;
-  }, []);
-
-  const { pack, trials } = session;
-
-  const [idx, setIdx] = useState(0);
-  const [correctCount, setCorrectCount] = useState(0);
-  const [saving, setSaving] = useState(false);
-
-  const trial = trials[idx];
-
-  // Optional: clear errors etc.
-  useEffect(() => {
-    // You can add per-trial timer here later
-  }, [idx]);
-
-  const choose = (choice) => {
-    const ok = choice === trial.correct;
-    const nextCorrect = ok ? correctCount + 1 : correctCount;
-
-    if (ok) setCorrectCount(nextCorrect);
-
-    // Next trial
-    if (idx + 1 < trials.length) {
-      setIdx((i) => i + 1);
+    if (round >= totalRounds) {
+      finishTest(nextCorrect);
       return;
     }
 
-    // Finished -> save discreetly
-    const ratio = nextCorrect / trials.length;
+    setRound((r) => r + 1);
+    nextQuestion();
+  }
 
-    const payload = {
-      testedAt: new Date().toISOString(),
-      sessionId: session.sessionId,
-      packId: pack.id,
-      packName: pack.name,
-      correct: nextCorrect,
-      total: trials.length,
-      ratio: Number(ratio.toFixed(4)),
-      trials: trials.map((t) => ({
-        level: t.level,
-        correct: t.correct,
-        glyph: t.glyph,
-      })),
-    };
-
-    localStorage.setItem("contrast_result", JSON.stringify(payload));
-    localStorage.removeItem(storageKey); // ✅ remove so next time it's a new random test
-
-    setSaving(true);
-    try {
-      onDone?.(payload);
-    } finally {
-      setSaving(false);
+  // Keyboard support (optional but nice)
+  useEffect(() => {
+    function onKeyDown(e) {
+      if (e.key === "ArrowUp") answer(0);
+      if (e.key === "ArrowRight") answer(90);
+      if (e.key === "ArrowDown") answer(180);
+      if (e.key === "ArrowLeft") answer(270);
     }
-  };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orientation, round, correct]);
 
   return (
-    <div
-      className="pv-card pv-ish-card"
-      style={{ maxWidth: 900, margin: "0 auto" }}
-    >
-      <div className="pv-header">
-        <h2 className="pv-title">Contrast Sensitivity Test</h2>
-        <p className="pv-subtitle">
-          Identify the opening direction: <b>Up / Right / Down / Left</b>.
-          <span className="pv-muted"> (No score will be displayed.)</span>
-        </p>
-      </div>
+    <div style={{ padding: 24, maxWidth: 780 }}>
+      <h2 style={{ marginBottom: 6 }}>Contrast Sensitivity Test</h2>
+      <p style={{ marginTop: 0 }}>
+        Identify the orientation of the letter as quickly and accurately as
+        possible.
+      </p>
 
-      {/* ✅ We do NOT show technical details, but pack name is OK (optional).
-          If you want totally hidden, delete the next line. */}
-      <div className="pv-meta">
-        <span className="pv-badge">Contrast</span>
-        <span className="pv-badge">
-          Trial {idx + 1}/{trials.length}
-        </span>
-        <span className="pv-badge">{pack.name}</span>
-      </div>
-
-      <div className="pv-plateArea" style={{ padding: 24 }}>
-        <div className="pv-contrastBox">
-          {pack.type === "landolt_c" ? (
-            // ✅ Landolt C (C rotated) — letter C by design
-            <div
-              className="pv-landolt"
-              style={{
-                opacity: trial.level,
-                transform: `rotate(${trial.correct * 90}deg)`,
-              }}
-              aria-label="Landolt C"
-            >
-              C
-            </div>
-          ) : (
-            // ✅ Other packs: random glyph per trial (letters/digits/symbols)
-            <div
-              className="pv-landolt"
-              style={{
-                opacity: trial.level,
-              }}
-              aria-label="Contrast glyph"
-            >
-              {trial.glyph}
-            </div>
-          )}
-        </div>
+      <div style={{ marginTop: 8, marginBottom: 14 }}>
+        <strong>Question {round}</strong> of <strong>{totalRounds}</strong>
       </div>
 
       <div
-        className="pv-actions"
-        style={{ justifyContent: "center", marginTop: 14 }}
+        style={{
+          background: "#fff",
+          border: "1px solid #e5e5e5",
+          borderRadius: 12,
+          height: 260,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          marginBottom: 16,
+        }}
       >
-        <button className="pv-btn" onClick={() => choose(0)} disabled={saving}>
-          Up
-        </button>
-        <button className="pv-btn" onClick={() => choose(1)} disabled={saving}>
-          Right
-        </button>
-        <button className="pv-btn" onClick={() => choose(2)} disabled={saving}>
-          Down
-        </button>
-        <button className="pv-btn" onClick={() => choose(3)} disabled={saving}>
-          Left
-        </button>
+        <div
+          style={{
+            fontSize: 110,
+            fontWeight: 800,
+            color: `rgb(${gray}, ${gray}, ${gray})`,
+            transform: `rotate(${orientation}deg)`,
+            userSelect: "none",
+            lineHeight: 1,
+          }}
+        >
+          {letter}
+        </div>
       </div>
 
-      <div className="pv-footerNote" style={{ textAlign: "center" }}>
-        Please answer based on what you see. {saving ? "Saving..." : ""}
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        {ORIENTATIONS.map((o) => (
+          <button
+            key={o.value}
+            onClick={() => answer(o.value)}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 10,
+              border: "1px solid #ddd",
+              background: "white",
+              cursor: "pointer",
+            }}
+          >
+            {o.label}
+          </button>
+        ))}
       </div>
+
+      <p style={{ marginTop: 14, color: "#666" }}>
+        The letter, rotation and contrast level change randomly each time.
+      </p>
     </div>
   );
 }

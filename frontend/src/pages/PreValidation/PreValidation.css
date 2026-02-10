@@ -1,15 +1,17 @@
-/* Page layout */
+/* ====== Page shell ====== */
 .pv-shell {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 28px;
+  padding: 28px 16px;
   background:
     radial-gradient(circle at 20% 10%, #e9f0ff, transparent 45%),
     radial-gradient(circle at 80% 30%, #f3eaff, transparent 55%), #f7f8fb;
+  box-sizing: border-box;
 }
 
+/* ====== Card container ====== */
 .pv-card {
   width: 100%;
   max-width: 980px;
@@ -20,17 +22,14 @@
   padding: 26px;
 }
 
-.pv-ish-card {
-  padding: 26px 26px 22px;
-}
-
+/* ====== Header ====== */
 .pv-header {
-  margin-bottom: 10px;
+  margin-bottom: 14px;
 }
 
 .pv-title {
   margin: 0;
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 800;
   letter-spacing: -0.02em;
 }
@@ -39,21 +38,31 @@
   margin: 8px 0 0;
   color: rgba(0, 0, 0, 0.65);
   font-size: 14px;
+  line-height: 1.4;
 }
 
 .pv-muted {
-  color: rgba(0, 0, 0, 0.5);
+  color: rgba(0, 0, 0, 0.55);
 }
 
+/* ====== Helpers ====== */
 .pv-section {
   margin-top: 14px;
+}
+.pv-center {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .pv-meta {
   display: flex;
   gap: 10px;
-  margin: 10px 0 12px;
+  margin: 6px 0 10px;
   flex-wrap: wrap;
+}
+.pv-meta-center {
+  justify-content: center;
 }
 
 .pv-badge {
@@ -65,6 +74,7 @@
   color: rgba(0, 0, 0, 0.7);
 }
 
+/* ====== Alert ====== */
 .pv-alert {
   background: rgba(255, 0, 0, 0.08);
   border: 1px solid rgba(255, 0, 0, 0.18);
@@ -75,6 +85,7 @@
   font-size: 13px;
 }
 
+/* ====== Consent ====== */
 .pv-consentBox {
   background: rgba(0, 0, 0, 0.03);
   border: 1px solid rgba(0, 0, 0, 0.06);
@@ -83,7 +94,7 @@
 }
 
 .pv-consentTitle {
-  font-weight: 700;
+  font-weight: 800;
   margin-bottom: 6px;
 }
 
@@ -102,28 +113,34 @@
 }
 
 .pv-actions {
-  margin-top: 14px;
   display: flex;
   gap: 12px;
   justify-content: flex-end;
 }
+.pv-actions-center {
+  justify-content: center;
+}
 
-/* Plate area */
+/* ====== Plate area (canvas) ====== */
 .pv-plateArea {
-  position: relative;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 12px;
   border-radius: 16px;
-  overflow: hidden;
-  background: white;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(0, 0, 0, 0.06);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  position: relative;
+  overflow: hidden;
 }
 
 .pv-canvas {
-  width: 100%;
-  height: auto;
   display: block;
+  width: 100% !important;
+  height: auto !important;
+  border-radius: 12px;
   background: white;
-  min-height: 360px;
 }
 
 /* Loading overlay */
@@ -131,10 +148,10 @@
   position: absolute;
   inset: 0;
   display: flex;
-  gap: 10px;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.75);
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(2px);
   font-size: 14px;
   color: rgba(0, 0, 0, 0.7);
@@ -155,9 +172,10 @@
   }
 }
 
-/* Question + input */
+/* ====== Question block ====== */
 .pv-questionBlock {
-  margin-top: 14px;
+  max-width: 900px;
+  margin: 14px auto 0;
 }
 
 .pv-questionTitle {
@@ -175,10 +193,12 @@
   display: flex;
   gap: 10px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .pv-input {
   flex: 1;
+  min-width: 260px;
   padding: 12px 12px;
   border-radius: 12px;
   border: 1px solid rgba(0, 0, 0, 0.14);
@@ -198,7 +218,7 @@
   border: 0;
   background: linear-gradient(180deg, #2f6bff, #1f55ff);
   color: white;
-  font-weight: 700;
+  font-weight: 800;
   cursor: pointer;
   min-width: 110px;
 }
@@ -208,31 +228,18 @@
   cursor: not-allowed;
 }
 
+/* Done */
 .pv-success {
   background: rgba(0, 170, 90, 0.1);
   border: 1px solid rgba(0, 170, 90, 0.2);
   color: rgba(0, 90, 50, 0.95);
   border-radius: 14px;
   padding: 12px 14px;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .pv-footerNote {
   margin-top: 12px;
   font-size: 12px;
   color: rgba(0, 0, 0, 0.55);
-}
-.pv-contrastBox {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 320px;
-}
-
-/* Big glyph */
-.pv-landolt {
-  font-size: 220px;
-  font-weight: 800;
-  line-height: 1;
-  user-select: none;
 }
