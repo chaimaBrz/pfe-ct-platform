@@ -1,270 +1,266 @@
-// src/pages/public/ObserverForm.jsx
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import "./PublicObserverForm.css";
+import bgImage from "../../assets/medical-bg.png";
+import { API_BASE_URL } from "../../config"; // adapte si besoin
 
-export default function ObserverForm() {
+export default function PublicObserverForm() {
   const { token } = useParams();
   const navigate = useNavigate();
 
-  // Statut = ce que tu montres dans l’UI
-  const [status, setStatus] = useState("EXPERT"); // EXPERT | NON_EXPERT | STUDENT
+  const [form, setForm] = useState({
+    firstName: "",
+    lastName: "",
+    age: "",
+    expertiseType: "RADIOLOGY", // RADIOLOGY | IMAGE_QUALITY | OTHER
+    experienceYears: "",
+    specialty: "CHEST",
+    consentAccepted: false,
+  });
 
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [age, setAge] = useState("");
-  const [experienceYears, setExperienceYears] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
 
-  // Expert path
   const specialtyOptions = useMemo(
     () => [
-      { value: "CHEST", label: "Chest" },
-      { value: "ABDOMINAL", label: "Abdominal" },
-      { value: "MSK", label: "MSK" },
-      { value: "EMERGENCY", label: "Emergency" },
-      { value: "ONCOLOGY", label: "Oncology" },
-      { value: "PEDIATRIC", label: "Pediatric" },
-      { value: "NEURORADIOLOGY", label: "Neuroradiology" },
+      "CHEST",
+      "ABDOMINAL",
+      "MSK",
+      "EMERGENCY",
+      "ONCOLOGY",
+      "PEDIATRIC",
+      "NEURO",
+      "OTHER",
+    ],
+    [],
+  );
+
+  const expertiseOptions = useMemo(
+    () => [
+      { value: "RADIOLOGY", label: "Radiology" },
+      { value: "IMAGE_QUALITY", label: "Image quality" },
       { value: "OTHER", label: "Other" },
     ],
     [],
   );
 
-  const [specialty, setSpecialty] = useState("CHEST");
-  const [specialtyOther, setSpecialtyOther] = useState("");
-
-  // Non expert path
-  const [nonExpertRole, setNonExpertRole] = useState(""); // “il est quoi”
-
-  const [consentAccepted, setConsentAccepted] = useState(false);
-  const [error, setError] = useState("");
-
-  const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:4000";
-
-  function validate() {
-    setError("");
-
-    if (!firstName.trim()) return "First name is required";
-    if (!lastName.trim()) return "Last name is required";
-
-    const a = Number(age);
-    if (!Number.isFinite(a) || a <= 0) return "Age must be a valid number";
-
-    const y = Number(experienceYears);
-    if (!Number.isFinite(y) || y < 0)
-      return "Years of experience must be valid";
-
-    if (!consentAccepted) return "You must accept consent to continue";
-
-    if (status === "EXPERT") {
-      if (!specialty) return "Specialty is required";
-      if (specialty === "OTHER" && !specialtyOther.trim())
-        return "Please specify your specialty";
-    } else {
-      if (!nonExpertRole.trim()) return "Please specify your role/background";
-    }
-
-    return null;
+  function update(name, value) {
+    setForm((f) => ({ ...f, [name]: value }));
   }
 
-  async function handleSubmit(e) {
-    e.preventDefault();
+  function validate() {
+    if (!form.firstName.trim()) return "First name is required.";
+    if (!form.lastName.trim()) return "Last name is required.";
 
-    const v = validate();
-    if (v) {
-      setError(v);
+    const ageNum = Number(form.age);
+    if (!Number.isFinite(ageNum) || ageNum < 18 || ageNum > 120)
+      return "Age must be a valid number (18–120).";
+
+    const expNum = Number(form.experienceYears);
+    if (!Number.isFinite(expNum) || expNum < 0 || expNum > 80)
+      return "Experience years must be a valid number (0–80).";
+
+    if (!form.consentAccepted) return "You must accept consent to continue.";
+    return "";
+  }
+
+  async function onSubmit(e) {
+    e.preventDefault();
+    setErr("");
+
+    const msg = validate();
+    if (msg) {
+      setErr(msg);
       return;
     }
 
-    // mapping vers backend
-    const expertiseType = status === "EXPERT" ? "RADIOLOGY" : "OTHER";
-
-    const observer = {
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      age: Number(age),
-      experienceYears: Number(experienceYears),
-      expertiseType,
-      consentAccepted: true,
+    const payload = {
+      token,
+      observer: {
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        age: Number(form.age),
+        expertiseType: form.expertiseType,
+        specialty: form.specialty,
+        experienceYears: Number(form.experienceYears),
+        consentAccepted: Boolean(form.consentAccepted),
+      },
     };
 
-    if (status === "EXPERT") {
-      observer.specialty = specialty;
-      if (specialty === "OTHER")
-        observer.specialtyOther = specialtyOther.trim();
-    } else {
-      // Non expert / Student
-      // (Optionnel mais utile pour analyse)
-      observer.expertiseOther =
-        status === "STUDENT"
-          ? `STUDENT - ${nonExpertRole.trim()}`
-          : nonExpertRole.trim();
-
-      // Si ton back exige "specialty" même pour OTHER, tu peux faire:
-      observer.specialty = "OTHER";
-    }
-
-    const body = { token, observer };
-
     try {
-      const res = await fetch(`${baseUrl}/public/session/start`, {
+      setLoading(true);
+
+      const res = await fetch(`${API_BASE_URL}/public/session/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(payload),
       });
 
-      if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(txt || "Request failed");
-      }
+      const text = await res.text();
+      if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
 
-      const json = await res.json(); // { sessionId }
+      const json = JSON.parse(text);
+
+      // ✅ important: même clé partout
       localStorage.setItem("sessionId", json.sessionId);
+      localStorage.setItem("publicToken", token);
 
-      // go to vision test
+      // ➜ page vision (ishihara + contraste)
       navigate(`/public/${token}/vision`);
-    } catch (err) {
-      setError(String(err.message || err));
+    } catch (e2) {
+      setErr(
+        typeof e2?.message === "string"
+          ? e2.message
+          : "Unable to start session.",
+      );
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
-    <div style={{ maxWidth: 720, margin: "24px auto", padding: 16 }}>
-      <h2>Observer profile</h2>
+    <div className="form-page" style={{ backgroundImage: `url(${bgImage})` }}>
+      <div className="form-overlay" />
 
-      {error && (
-        <div
-          style={{ padding: 12, marginBottom: 12, border: "1px solid #f5c2c7" }}
-        >
-          {error}
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit}>
-        <label>
-          First Name *
-          <input
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
-            placeholder="e.g., Sarah"
-          />
-        </label>
-
-        <label>
-          Last Name *
-          <input
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
-            placeholder="e.g., Martin"
-          />
-        </label>
-
-        <label>
-          Age *
-          <input
-            value={age}
-            onChange={(e) => setAge(e.target.value)}
-            placeholder="e.g., 35"
-            inputMode="numeric"
-          />
-        </label>
-
-        <div style={{ marginTop: 14 }}>
+      <header className="form-header">
+        <div className="logo">
+          <div className="logo-circle">CT</div>
           <div>
-            <b>Status *</b>
+            <div className="logo-title">CT Image Evaluation</div>
+            <div className="logo-sub">Observer portal</div>
           </div>
-
-          <label style={{ display: "block", marginTop: 6 }}>
-            <input
-              type="radio"
-              name="status"
-              checked={status === "EXPERT"}
-              onChange={() => setStatus("EXPERT")}
-            />{" "}
-            Expert (Radiologist)
-          </label>
-
-          <label style={{ display: "block", marginTop: 6 }}>
-            <input
-              type="radio"
-              name="status"
-              checked={status === "NON_EXPERT"}
-              onChange={() => setStatus("NON_EXPERT")}
-            />{" "}
-            Non-expert
-          </label>
-
-          <label style={{ display: "block", marginTop: 6 }}>
-            <input
-              type="radio"
-              name="status"
-              checked={status === "STUDENT"}
-              onChange={() => setStatus("STUDENT")}
-            />{" "}
-            Student
-          </label>
         </div>
 
-        <label style={{ marginTop: 14 }}>
-          Years of Experience *
-          <input
-            value={experienceYears}
-            onChange={(e) => setExperienceYears(e.target.value)}
-            placeholder="e.g., 8"
-            inputMode="numeric"
-          />
-        </label>
+        <div className="top-badges">
+          <span className="badge">Anonymous</span>
+          <span className="badge">No account</span>
+          <span className="badge">~ 1 min</span>
+        </div>
+      </header>
 
-        {status === "EXPERT" ? (
-          <>
-            <label style={{ marginTop: 14 }}>
-              Specialty / Subspecialty *
-              <select
-                value={specialty}
-                onChange={(e) => setSpecialty(e.target.value)}
-              >
-                {specialtyOptions.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
+      <main className="form-content">
+        <section className="form-left">
+          <h1>
+            Observer <span>profile</span>
+          </h1>
+          <p className="form-desc">
+            Please fill in your profile information. This helps interpret
+            results by experience level. Data is recorded discreetly.
+          </p>
+
+          <div className="info-card">
+            <div className="card-title">Privacy</div>
+            <p className="card-text">
+              No vision score will be displayed. Answers are stored for research
+              purposes only.
+            </p>
+          </div>
+        </section>
+
+        <aside className="form-right">
+          <div className="panel-title">Profile form</div>
+          <div className="panel-sub">All fields are required</div>
+
+          <form onSubmit={onSubmit} className="panel-form">
+            <div className="grid-2">
+              <div className="field">
+                <label>First name</label>
+                <input
+                  value={form.firstName}
+                  onChange={(e) => update("firstName", e.target.value)}
+                  placeholder="e.g., Sarah"
+                  autoComplete="given-name"
+                />
+              </div>
+
+              <div className="field">
+                <label>Last name</label>
+                <input
+                  value={form.lastName}
+                  onChange={(e) => update("lastName", e.target.value)}
+                  placeholder="e.g., Martin"
+                  autoComplete="family-name"
+                />
+              </div>
+            </div>
+
+            <div className="grid-2">
+              <div className="field">
+                <label>Age</label>
+                <input
+                  value={form.age}
+                  onChange={(e) => update("age", e.target.value)}
+                  placeholder="e.g., 35"
+                  inputMode="numeric"
+                />
+              </div>
+
+              <div className="field">
+                <label>Years of experience</label>
+                <input
+                  value={form.experienceYears}
+                  onChange={(e) => update("experienceYears", e.target.value)}
+                  placeholder="e.g., 8"
+                  inputMode="numeric"
+                />
+              </div>
+            </div>
+
+            <div className="grid-2">
+              <div className="field">
+                <label>Expertise type</label>
+                <select
+                  value={form.expertiseType}
+                  onChange={(e) => update("expertiseType", e.target.value)}
+                >
+                  {expertiseOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="field">
+                <label>Specialty</label>
+                <select
+                  value={form.specialty}
+                  onChange={(e) => update("specialty", e.target.value)}
+                >
+                  {specialtyOptions.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <label className="consent-row">
+              <input
+                type="checkbox"
+                checked={form.consentAccepted}
+                onChange={(e) => update("consentAccepted", e.target.checked)}
+              />
+              <span>I accept to participate voluntarily (consent).</span>
             </label>
 
-            {specialty === "OTHER" && (
-              <label style={{ marginTop: 10 }}>
-                Please specify *
-                <input
-                  value={specialtyOther}
-                  onChange={(e) => setSpecialtyOther(e.target.value)}
-                  placeholder="Type your specialty"
-                />
-              </label>
-            )}
-          </>
-        ) : (
-          <label style={{ marginTop: 14 }}>
-            Please specify your background/role *
-            <input
-              value={nonExpertRole}
-              onChange={(e) => setNonExpertRole(e.target.value)}
-              placeholder="e.g., Image quality engineer, researcher..."
-            />
-          </label>
-        )}
+            {err && <div className="error-box">❌ {err}</div>}
 
-        <label style={{ display: "block", marginTop: 14 }}>
-          <input
-            type="checkbox"
-            checked={consentAccepted}
-            onChange={(e) => setConsentAccepted(e.target.checked)}
-          />{" "}
-          I accept to participate (consent) *
-        </label>
+            <button className="submit-btn" disabled={loading}>
+              {loading ? "Saving…" : "Continue"}
+            </button>
 
-        <button style={{ marginTop: 16 }} type="submit">
-          Continue
-        </button>
-      </form>
+            <div className="mini-note">
+              Next: Vision test (Ishihara + contrast)
+            </div>
+          </form>
+        </aside>
+      </main>
+
+      <footer className="form-footer">
+        CT Image Evaluation Platform – Public observer access
+      </footer>
     </div>
   );
 }

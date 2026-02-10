@@ -1,43 +1,42 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
-import Login from "./pages/Login";
-import Admin from "./pages/Admin";
-import ProtectedRoute from "./routes/ProtectedRoute";
-
-// ✅ PUBLIC PAGES (bons noms)
+// Public pages
 import PublicLanding from "./pages/public/PublicLanding.jsx";
 import PublicObserverForm from "./pages/public/PublicObserverForm.jsx";
-import PublicVisionTest from "./pages/public/PublicVisionTest.jsx";
 import PublicDemo from "./pages/public/PublicDemo.jsx";
 import PublicProtocol from "./pages/public/PublicProtocol.jsx";
 import PublicPairwise from "./pages/public/PublicPairwise.jsx";
+import PublicRating from "./pages/public/PublicRating.jsx";
+
+// ✅ Vision step = PreValidation (Ishihara PDF + Contrast + POST /vision)
+import PreValidation from "./pages/PreValidation/PreValidation.jsx";
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Admin side */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="/login" element={<Login />} />
-
         <Route
-          path="/admin"
+          path="/"
           element={
-            <ProtectedRoute allow={["ADMIN"]}>
-              <Admin />
-            </ProtectedRoute>
+            <div style={{ padding: 30 }}>
+              ✅ Front OK — ouvre un lien /public/TOKEN
+            </div>
           }
         />
 
-        {/* ✅ Public observer flow (NO login) */}
+        {/* PUBLIC OBSERVER FLOW */}
         <Route path="/public/:token" element={<PublicLanding />} />
         <Route path="/public/:token/form" element={<PublicObserverForm />} />
-        <Route path="/public/:token/vision" element={<PublicVisionTest />} />
+
+        {/* ✅ remplace PublicVisionTest */}
+        <Route path="/public/:token/vision" element={<PreValidation />} />
+
         <Route path="/public/:token/demo" element={<PublicDemo />} />
         <Route path="/public/:token/protocol" element={<PublicProtocol />} />
         <Route path="/public/:token/pairwise" element={<PublicPairwise />} />
+        <Route path="/public/:token/rating" element={<PublicRating />} />
 
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );

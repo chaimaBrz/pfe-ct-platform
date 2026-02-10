@@ -1,31 +1,64 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import "./PublicDemo.css";
 
 export default function PublicDemo() {
   const navigate = useNavigate();
+  const { token } = useParams();
 
   return (
-    <div style={{ padding: 16, maxWidth: 720 }}>
-      <h2>Vidéo de démonstration</h2>
+    <div className="demo-page">
+      {/* Top bar */}
+      <header className="demo-topbar">
+        <div className="demo-brand">
+          <div className="demo-logo">CT</div>
+          <div>
+            <div className="demo-brandTitle">CT Image Evaluation</div>
+            <div className="demo-brandSub">Demo instructions</div>
+          </div>
+        </div>
 
-      <p>Regarde la vidéo puis clique “Continuer”.</p>
+        <div className="demo-pills">
+          <span className="demo-pill">Anonymous</span>
+          <span className="demo-pill">No account</span>
+          <span className="demo-pill">10–15 min</span>
+        </div>
+      </header>
 
-      <video
-        controls
-        style={{ width: "100%", borderRadius: 8, border: "1px solid #ddd" }}
-        src="/demo.mp4"
-        onError={() => {
-          // si tu n’as pas de vidéo pour l’instant, pas grave
-        }}
-      />
+      {/* Content */}
+      <main className="demo-container">
+        <h1 className="demo-title">Demonstration video</h1>
+        <p className="demo-subtitle">
+          Watch the video, then click <b>Continue</b>.
+        </p>
 
-      <div style={{ marginTop: 12 }}>
-        <button
-          onClick={() => navigate("/public/protocol")}
-          style={{ padding: "10px 14px", cursor: "pointer" }}
-        >
-          Continuer
-        </button>
-      </div>
+        <section className="demo-card">
+          <video className="demo-video" controls src="/demo.mp4" />
+
+          <div className="demo-tip">
+            Tip: switch to full screen to see image details more clearly.
+          </div>
+
+          <div className="demo-actions">
+            <button
+              className="demo-btn demo-btnGhost"
+              onClick={() => navigate(`/public/${token}/vision`)}
+            >
+              Back
+            </button>
+
+            <button
+              className="demo-btn demo-btnPrimary"
+              onClick={() => navigate(`/public/${token}/protocol`)}
+            >
+              Continue
+            </button>
+          </div>
+        </section>
+
+        <footer className="demo-footer">
+          CT Image Evaluation Platform – Public observer access
+        </footer>
+      </main>
     </div>
   );
 }

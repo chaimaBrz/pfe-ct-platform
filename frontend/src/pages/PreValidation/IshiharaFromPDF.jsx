@@ -7,11 +7,8 @@ import "./PreValidation.css";
 GlobalWorkerOptions.workerSrc = workerUrl;
 
 const PDF_URL = "/ishihara/ishihara_REAL.pdf";
-
-// ⚠️ Ajuste si besoin (dans ton PDF, la 1ère planche est souvent vers 3)
 const START_PDF_PAGE = 3;
 
-// ✅ Normal vision answers (24 plates)
 const ANSWER_KEY = [
   "12",
   "8",
@@ -39,8 +36,9 @@ const ANSWER_KEY = [
   "35",
 ];
 
-export default function IshiharaFromPDF() {
+export default function IshiharaFromPDF({ onDone }) {
   const canvasRef = useRef(null);
+  const wrapRef = useRef(null);
 
   const [step, setStep] = useState("CONSENT"); // CONSENT | TEST | DONE
   const [agree, setAgree] = useState(false);
@@ -55,16 +53,14 @@ export default function IshiharaFromPDF() {
 
   const total = ANSWER_KEY.length;
 
-  // ---- Load PDF once
+  // Load PDF once
   useEffect(() => {
     let cancelled = false;
-
     (async () => {
       try {
         setError("");
         const doc = await getDocument(PDF_URL).promise;
-        if (cancelled) return;
-        setPdfDoc(doc);
+        if (!cancelled) setPdfDoc(doc);
       } catch (e) {
         console.error("LOAD ERROR:", e);
         if (!cancelled)
@@ -73,13 +69,12 @@ export default function IshiharaFromPDF() {
           );
       }
     })();
-
     return () => {
       cancelled = true;
     };
   }, []);
 
-  // ---- Render plate when index changes
+  // Render plate when index/step changes (auto-fit)
   useEffect(() => {
     let cancelled = false;
 
@@ -91,8 +86,6 @@ export default function IshiharaFromPDF() {
         setError("");
 
         const pageNumber = START_PDF_PAGE + index;
-
-        // Safety
         if (pageNumber > pdfDoc.numPages) {
           setError("The test file is not compatible (missing pages).");
           setLoading(false);
@@ -100,29 +93,27 @@ export default function IshiharaFromPDF() {
         }
 
         const page = await pdfDoc.getPage(pageNumber);
-        const viewport = page.getViewport({ scale: 1.6 });
 
-        // wait for canvas to exist
+        // container width -> scale
         await new Promise((r) => requestAnimationFrame(r));
         if (cancelled) return;
 
         const canvas = canvasRef.current;
-        if (!canvas) {
-          setLoading(false);
-          return;
-        }
+        const wrap = wrapRef.current;
+        if (!canvas || !wrap) return;
+
+        const unscaled = page.getViewport({ scale: 1 });
+        const padding = 24; // padding inside wrapper
+        const availableWidth = Math.max(320, wrap.clientWidth - padding);
+
+        const scale = Math.min(2.0, availableWidth / unscaled.width);
+        const viewport = page.getViewport({ scale });
 
         const ctx = canvas.getContext("2d");
-        if (!ctx) {
-          setError("Display error.");
-          setLoading(false);
-          return;
-        }
-
         canvas.width = Math.floor(viewport.width);
         canvas.height = Math.floor(viewport.height);
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         await page.render({ canvasContext: ctx, viewport }).promise;
 
         if (!cancelled) setLoading(false);
@@ -137,8 +128,13 @@ export default function IshiharaFromPDF() {
 
     render();
 
+    // re-render on resize (important)
+    const onResize = () => render();
+    window.addEventListener("resize", onResize);
+
     return () => {
       cancelled = true;
+      window.removeEventListener("resize", onResize);
     };
   }, [pdfDoc, index, step]);
 
@@ -161,12 +157,10 @@ export default function IshiharaFromPDF() {
 
     const userSaysNothing =
       user === "" || user === "nothing" || user === "none" || user === "no";
-
     const isCorrect =
       expected === "nothing" ? userSaysNothing : user === expected;
 
     const nextCorrect = isCorrect ? correct + 1 : correct;
-
     setInput("");
 
     if (index + 1 < total) {
@@ -175,7 +169,6 @@ export default function IshiharaFromPDF() {
       return;
     }
 
-    // ✅ Save discreetly (no score shown)
     localStorage.setItem(
       "ishihara_result",
       JSON.stringify({
@@ -189,6 +182,7 @@ export default function IshiharaFromPDF() {
 
     setCorrect(nextCorrect);
     setStep("DONE");
+    onDone?.({ ishiharaScore: nextCorrect, ishiharaTotal: total });
   };
 
   return (
@@ -204,7 +198,7 @@ export default function IshiharaFromPDF() {
       {error && <div className="pv-alert">❌ {error}</div>}
 
       {step === "CONSENT" && (
-        <div className="pv-section">
+        <div className="pv-section pv-center">
           <div className="pv-consentBox">
             <div className="pv-consentTitle">Consent</div>
             <div className="pv-consentText">
@@ -224,7 +218,7 @@ export default function IshiharaFromPDF() {
             </label>
           </div>
 
-          <div className="pv-actions">
+          <div className="pv-actions pv-actions-center">
             <button className="pv-btn" onClick={startTest} disabled={!pdfDoc}>
               {pdfDoc ? "Start Test" : "Loading..."}
             </button>
@@ -234,13 +228,14 @@ export default function IshiharaFromPDF() {
 
       {step === "TEST" && (
         <div className="pv-section">
-          <div className="pv-meta">
+          <div className="pv-meta pv-meta-center">
             <span className="pv-badge">
               Plate {index + 1}/{total}
             </span>
           </div>
 
-          <div className="pv-plateArea">
+          {/* ✅ Image centrée + titre au-dessus */}
+          <div ref={wrapRef} className="pv-plateArea">
             <canvas ref={canvasRef} className="pv-canvas" />
 
             {loading && (
@@ -269,10 +264,10 @@ export default function IshiharaFromPDF() {
                 Next
               </button>
             </div>
-          </div>
 
-          <div className="pv-footerNote">
-            Your answers are saved discreetly.
+            <div className="pv-footerNote">
+              Your answers are saved discreetly.
+            </div>
           </div>
         </div>
       )}
