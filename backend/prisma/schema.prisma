@@ -182,11 +182,17 @@ model ImageAsset {
   metadataJson Json?
   createdAt    DateTime    @default(now())
 
+  // ✅ DICOM identifiers (pour DICOMweb / OHIF)
+  studyInstanceUID  String?
+  seriesInstanceUID String?
+  sopInstanceUID    String?
+
   // relations inverses (facultatif mais pratique)
   asLeftInTasks  PairwiseTask[] @relation("LeftImage")
   asRightInTasks PairwiseTask[] @relation("RightImage")
   studyImages    StudyImage[]
 }
+
 
 model StudyImage {
   id      String   @id @default(uuid())
