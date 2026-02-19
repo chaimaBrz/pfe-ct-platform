@@ -1,0 +1,124 @@
+.ct-contrast {
+  min-height: 100vh;
+  padding: 28px 28px 40px;
+  color: #0f172a;
+  font-family:
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    Arial,
+    sans-serif;
+
+  background: radial-gradient(
+    circle at 20% 20%,
+    rgba(255, 255, 255, 0.9),
+    rgba(224, 242, 254, 0.86),
+    rgba(186, 230, 253, 0.72)
+  );
+}
+
+.ct-contrast-inner {
+  width: min(980px, 100%);
+  margin: 0 auto;
+}
+
+.ct-title {
+  margin: 0 0 8px;
+  font-size: clamp(28px, 3.2vw, 44px);
+  line-height: 1.1;
+  font-weight: 900;
+  color: rgba(15, 23, 42, 0.95);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.ct-desc {
+  margin: 0 0 14px;
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: rgba(15, 23, 42, 0.84);
+  max-width: 80ch;
+}
+
+.ct-progress {
+  margin: 10px 0 14px;
+  font-weight: 800;
+  color: rgba(15, 23, 42, 0.92);
+}
+
+.ct-card {
+  width: 100%;
+  background: linear-gradient(
+    180deg,
+    rgba(224, 242, 254, 0.86),
+    rgba(186, 230, 253, 0.62)
+  );
+  border: 1px solid rgba(147, 197, 253, 0.45);
+  border-radius: 22px;
+  backdrop-filter: blur(18px);
+  box-shadow: 0 22px 48px rgba(59, 130, 246, 0.18);
+  padding: 22px;
+}
+
+.ct-stimulus {
+  display: grid;
+  place-items: center;
+  min-height: 340px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(147, 197, 253, 0.35);
+}
+
+.ct-letter {
+  font-size: clamp(120px, 18vw, 200px);
+  font-weight: 900;
+  user-select: none;
+  line-height: 1;
+}
+
+.ct-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.ct-btn {
+  appearance: none;
+  border: 1px solid rgba(147, 197, 253, 0.55);
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 14px;
+  padding: 11px 16px;
+  font-weight: 900;
+  color: rgba(15, 23, 42, 0.92);
+  cursor: pointer;
+  transition:
+    transform 0.05s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.ct-btn:hover {
+  border-color: rgba(59, 130, 246, 0.75);
+  box-shadow: 0 10px 20px rgba(59, 130, 246, 0.14);
+}
+
+.ct-btn:active {
+  transform: translateY(1px);
+}
+
+.ct-note {
+  margin: 14px 0 0;
+  color: rgba(15, 23, 42, 0.72);
+  font-size: 0.98rem;
+  line-height: 1.6;
+}
+
+@media (max-width: 720px) {
+  .ct-contrast {
+    padding: 18px 16px 28px;
+  }
+  .ct-stimulus {
+    min-height: 280px;
+  }
+}

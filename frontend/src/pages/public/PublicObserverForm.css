@@ -85,29 +85,54 @@
 /* Layout */
 .form-content {
   display: grid;
-  grid-template-columns: 1.1fr 1fr;
-  gap: 42px;
-  padding: 20px 48px 10px;
-  position: relative;
-  z-index: 1;
+  grid-template-columns: 1fr; /* ✅ une seule colonne */
+  gap: 18px;
+  justify-items: center; /* centre le contenu */
 }
 
+.form-left {
+  width: 100%;
+  max-width: 980px;
+}
+
+.form-right {
+  width: 100%;
+  max-width: 720px; /* formulaire bien centré */
+}
+
+/* ✅ Rend le titre + la description lisibles sur fond clair */
+.form-left {
+  width: 100%;
+  max-width: 980px;
+
+  /* ✅ style "glass" bleu (pas blanc) */
+  background: linear-gradient(
+    180deg,
+    rgba(219, 234, 254, 0.62),
+    rgba(191, 219, 254, 0.42)
+  );
+  border: 1px solid rgba(147, 197, 253, 0.35);
+  backdrop-filter: blur(16px);
+  border-radius: 22px;
+
+  /* ✅ plus d'espace mais sans faire un gros bloc vide */
+  padding: 18px 22px;
+  box-shadow: 0 18px 42px rgba(59, 130, 246, 0.14);
+}
+/* Titre plus contrasté */
 .form-left h1 {
   font-size: 2.3rem;
   line-height: 1.1;
   margin: 0 0 10px;
+
+  /* ✅ plus "premium" que noir pur */
+  color: rgba(15, 23, 42, 0.92);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 
-.form-left h1 span {
-  color: #3b82f6;
-}
-
+/* Sous-texte plus lisible */
 .form-desc {
-  font-size: 0.98rem;
-  line-height: 1.65;
-  max-width: 65ch;
-  color: rgba(15, 23, 42, 0.85);
-  margin: 0 0 16px;
+  color: rgba(15, 23, 42, 0.8);
 }
 
 .info-card {

@@ -56,6 +56,7 @@ export default function IshiharaFromPDF({ onDone }) {
   // Load PDF once
   useEffect(() => {
     let cancelled = false;
+
     (async () => {
       try {
         setError("");
@@ -63,12 +64,14 @@ export default function IshiharaFromPDF({ onDone }) {
         if (!cancelled) setPdfDoc(doc);
       } catch (e) {
         console.error("LOAD ERROR:", e);
-        if (!cancelled)
+        if (!cancelled) {
           setError(
             "Unable to load the test file. Please contact the administrator.",
           );
+        }
       }
     })();
+
     return () => {
       cancelled = true;
     };
@@ -103,7 +106,7 @@ export default function IshiharaFromPDF({ onDone }) {
         if (!canvas || !wrap) return;
 
         const unscaled = page.getViewport({ scale: 1 });
-        const padding = 24; // padding inside wrapper
+        const padding = 24;
         const availableWidth = Math.max(320, wrap.clientWidth - padding);
 
         const scale = Math.min(2.0, availableWidth / unscaled.width);
@@ -128,7 +131,6 @@ export default function IshiharaFromPDF({ onDone }) {
 
     render();
 
-    // re-render on resize (important)
     const onResize = () => render();
     window.addEventListener("resize", onResize);
 
@@ -189,16 +191,54 @@ export default function IshiharaFromPDF({ onDone }) {
     <>
       <div className="pv-header">
         <h2 className="pv-title">Ishihara Color Vision Test</h2>
-        <p className="pv-subtitle">
-          Please answer based on what you see.{" "}
-          <span className="pv-muted">(No score will be displayed.)</span>
-        </p>
+        <p className="pv-subtitle"></p>
       </div>
 
       {error && <div className="pv-alert">❌ {error}</div>}
 
       {step === "CONSENT" && (
         <div className="pv-section pv-center">
+          {/* Info card au-dessus du consent */}
+          <div className="pv-infoCard">
+            <div className="pv-infoTitle">
+              Quick color-vision check (Ishihara)
+            </div>
+
+            <p className="pv-infoText">
+              This is a short, standard screening test used to check color
+              vision. It helps us interpret study results.{" "}
+              <b>No score will be shown.</b>
+            </p>
+
+            <div className="pv-infoGrid">
+              <div>
+                <div className="pv-infoSubtitle">How it works</div>
+                <ol className="pv-infoList">
+                  <li>You will see a series of colored dot plates.</li>
+                  <li>If you see a number, type it.</li>
+                  <li>
+                    If you don’t see a number, leave it empty and click{" "}
+                    <b>Next</b>.
+                  </li>
+                  <li>Answer with your first impression.</li>
+                </ol>
+              </div>
+
+              <div>
+                <div className="pv-infoSubtitle">Recommended conditions</div>
+                <ul className="pv-infoList">
+                  <li>Use a well-lit screen.</li>
+                  <li>Avoid strong color filters / night mode if possible.</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="pv-infoNote">
+              Your answers are stored for research interpretation only.
+            </div>
+          </div>
+
+          {/* Consent box */}
           <div className="pv-consentBox">
             <div className="pv-consentTitle">Consent</div>
             <div className="pv-consentText">
@@ -234,40 +274,43 @@ export default function IshiharaFromPDF({ onDone }) {
             </span>
           </div>
 
-          {/* ✅ Image centrée + titre au-dessus */}
-          <div ref={wrapRef} className="pv-plateArea">
-            <canvas ref={canvasRef} className="pv-canvas" />
+          <div className="pv-testLayout">
+            <div ref={wrapRef} className="pv-plateArea pv-plateAreaWide">
+              <canvas ref={canvasRef} className="pv-canvas" />
 
-            {loading && (
-              <div className="pv-loadingOverlay">
-                <div className="pv-spinner" />
-                <div>Loading plate…</div>
+              {loading && (
+                <div className="pv-loadingOverlay">
+                  <div className="pv-spinner" />
+                  <div>Loading plate…</div>
+                </div>
+              )}
+            </div>
+
+            <aside className="pv-sidePanel">
+              <div className="pv-questionBlock pv-questionBlockSticky">
+                <div className="pv-questionTitle">What number do you see?</div>
+                <div className="pv-hint">
+                  If you see nothing, leave it empty and press <b>Next</b>.
+                </div>
+
+                <div className="pv-inputRow">
+                  <input
+                    className="pv-input"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder='Type the number (or leave empty for "nothing")'
+                    onKeyDown={(e) => e.key === "Enter" && next()}
+                  />
+                  <button className="pv-btn" onClick={next} disabled={loading}>
+                    Next
+                  </button>
+                </div>
+
+                <div className="pv-footerNote">
+                  Your answers are saved discreetly.
+                </div>
               </div>
-            )}
-          </div>
-
-          <div className="pv-questionBlock">
-            <div className="pv-questionTitle">What number do you see?</div>
-            <div className="pv-hint">
-              If you see nothing, leave it empty and press <b>Next</b>.
-            </div>
-
-            <div className="pv-inputRow">
-              <input
-                className="pv-input"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder='Type the number (or leave empty for "nothing")'
-                onKeyDown={(e) => e.key === "Enter" && next()}
-              />
-              <button className="pv-btn" onClick={next} disabled={loading}>
-                Next
-              </button>
-            </div>
-
-            <div className="pv-footerNote">
-              Your answers are saved discreetly.
-            </div>
+            </aside>
           </div>
         </div>
       )}

@@ -61,7 +61,7 @@ export default function PublicLanding() {
             className="start-btn"
             onClick={() => navigate(`/public/${token}/form`)}
           >
-            Get Started
+            Start the study
           </button>
 
           <div className="consent-text">

@@ -149,16 +149,45 @@
 
 /* BUTTON */
 .start-btn {
-  margin-top: 10px;
-  padding: 12px 34px;
-  border-radius: 16px;
+  width: 100%;
+  max-width: 420px;
+  padding: 16px 22px;
+  margin-top: 18px;
+
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+
   border: none;
-  font-size: 0.95rem;
-  font-weight: 800;
+  border-radius: 14px;
+
+  color: #06263a;
+  background: linear-gradient(90deg, #28c7ff, #00e6c3);
+
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.18);
   cursor: pointer;
-  background: linear-gradient(135deg, #60a5fa, #22d3ee);
-  color: #083344;
-  box-shadow: 0 14px 28px rgba(34, 211, 238, 0.22);
+
+  transform: translateY(0);
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease,
+    filter 0.12s ease;
+}
+
+.start-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 34px rgba(0, 0, 0, 0.22);
+  filter: brightness(1.03);
+}
+
+.start-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 12px 22px rgba(0, 0, 0, 0.18);
+}
+
+.start-btn:focus-visible {
+  outline: 3px solid rgba(40, 199, 255, 0.55);
+  outline-offset: 3px;
 }
 
 .start-btn:hover {
@@ -265,4 +294,10 @@
   .landing-left h1 {
     font-size: 2.1rem;
   }
+}
+.cta-hint {
+  margin-top: 10px;
+  max-width: 420px;
+  font-size: 13px;
+  opacity: 0.85;
 }

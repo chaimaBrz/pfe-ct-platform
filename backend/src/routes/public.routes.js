@@ -1,7 +1,92 @@
 const express = require("express");
 const prisma = require("../db/prisma");
 
+const { createProxyMiddleware } = require("http-proxy-middleware");
 const router = express.Router();
+
+const ORTHANC_URL = process.env.ORTHANC_URL || "http://localhost:8042";
+const ORTHANC_USER = process.env.ORTHANC_USER || "admin";
+const ORTHANC_PASS = process.env.ORTHANC_PASS || "admin";
+
+router.use(
+  "/dicom-web",
+  createProxyMiddleware({
+    target: ORTHANC_URL,
+    changeOrigin: true,
+
+    // Express enlève "/dicom-web" => on remet avant d'envoyer à Orthanc
+    pathRewrite: (path) =>
+      path.startsWith("/dicom-web") ? path : `/dicom-web${path}`,
+
+    // ✅ le plus robuste (au lieu de onProxyReq)
+    auth: `${ORTHANC_USER}:${ORTHANC_PASS}`,
+
+    // utile en debug
+    logLevel: "debug",
+  }),
+);
+
+router.use(
+  "/wado",
+  createProxyMiddleware({
+    target: ORTHANC_URL,
+    changeOrigin: true,
+    pathRewrite: (path) => (path.startsWith("/wado") ? path : `/wado${path}`),
+    onProxyReq: (proxyReq) => {
+      const token = Buffer.from(`${ORTHANC_USER}:${ORTHANC_PASS}`).toString(
+        "base64",
+      );
+      proxyReq.setHeader("Authorization", `Basic ${token}`);
+    },
+  }),
+);
+
+function orthancAuthHeader() {
+  const token = Buffer.from(`${ORTHANC_USER}:${ORTHANC_PASS}`).toString(
+    "base64",
+  );
+  return { Authorization: `Basic ${token}` };
+}
+
+/**
+ * GET /public/dicom/rendered?studyUID=...&seriesUID=...&sopUID=...
+ * -> renvoie une image (png/jpeg) rendue par Orthanc DICOMweb
+ */
+router.get("/dicom/rendered", async (req, res) => {
+  try {
+    const { studyUID, seriesUID, sopUID } = req.query;
+
+    if (!studyUID || !seriesUID || !sopUID) {
+      return res
+        .status(400)
+        .json({ message: "Missing studyUID/seriesUID/sopUID" });
+    }
+
+    const url =
+      `${ORTHANC_URL}/dicom-web/studies/${encodeURIComponent(studyUID)}` +
+      `/series/${encodeURIComponent(seriesUID)}` +
+      `/instances/${encodeURIComponent(sopUID)}/rendered`;
+
+    const r = await fetch(url, {
+      headers: {
+        ...orthancAuthHeader(),
+        Accept: "image/png",
+      },
+    });
+
+    if (!r.ok) {
+      const t = await r.text();
+      return res.status(r.status).send(t);
+    }
+
+    res.setHeader("Content-Type", r.headers.get("content-type") || "image/png");
+    const buf = Buffer.from(await r.arrayBuffer());
+    return res.send(buf);
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
 
 /**
  * GET /public/study/:token
@@ -48,25 +133,61 @@ router.get("/study/:token", async (req, res) => {
  * Body:
  * {
  *   token,
- *   observer: { firstName, lastName, age?, expertiseType, specialty?, experienceYears?, consentAccepted }
+ *   observer: {
+ *     age,
+ *     visionStatus,
+ *     fatigueLevel,
+ *     expertiseType,
+ *     specialty?,          // si expertiseType === RADIOLOGY
+ *     experienceYears?,    // optionnel
+ *     otherExpertise?      // si expertiseType === OTHER
+ *     consentAccepted
+ *   }
  * }
  * -> { sessionId }
  */
+// ✅ Remplace le handler de POST /public/session/start par celui-ci
 router.post("/session/start", async (req, res) => {
   try {
-    const { token, observer } = req.body || {};
+    const body = req.body || {};
+    const { token } = body;
+    const observer = body.observer || {};
 
-    if (
-      !token ||
-      !observer?.firstName ||
-      !observer?.lastName ||
-      !observer?.expertiseType
-    ) {
-      return res.status(400).json({ message: "Missing required fields" });
+    const {
+      age,
+      visionStatus, // vient du front
+      fatigueLevel,
+      expertiseType,
+      specialty,
+      experienceYears,
+      otherExpertise,
+      consentAccepted,
+    } = observer;
+
+    const expertiseTypeMap = {
+      RADIOLOGY: "RADIOLOGY",
+      IMAGE_QUALITY: "MEDICAL_IMAGING", // front envoie IMAGE_QUALITY
+      MEDICAL_IMAGING: "MEDICAL_IMAGING", // au cas où
+      OTHER: "OTHER",
+    };
+
+    const mappedExpertiseType = expertiseTypeMap[expertiseType] || "OTHER";
+    // 1) validations
+    const parsedAge = Number(String(age ?? "").trim());
+    if (!Number.isFinite(parsedAge) || parsedAge <= 0) {
+      return res.status(400).json({ message: "Invalid age" });
+    }
+    if (!consentAccepted) {
+      return res.status(400).json({ message: "Consent required" });
+    }
+    if (!token) {
+      return res.status(400).json({ message: "Missing token" });
     }
 
+    // 2) vérifier token invitation
     const invite = await prisma.studyInvitation.findUnique({
       where: { token },
+      include: { study: true },
     });
 
     if (!invite) return res.status(404).json({ message: "Invalid token" });
@@ -75,39 +196,82 @@ router.post("/session/start", async (req, res) => {
     if (invite.maxUses != null && invite.usedCount >= invite.maxUses)
       return res.status(410).json({ message: "Token max uses reached" });
 
-    const createdObserver = await prisma.observerProfile.create({
-      data: {
-        firstName: observer.firstName,
-        lastName: observer.lastName,
-        age: observer.age ?? null,
-        expertiseType: observer.expertiseType, // "RADIOLOGY"|"IMAGE_QUALITY"|"OTHER"
-        specialty: observer.specialty ?? null, // "CHEST"|...|"OTHER"
-        experienceYears: observer.experienceYears ?? null,
-        consentAccepted: !!observer.consentAccepted,
-      },
+    // 3) mapping visionStatus (front) -> valeurs sûres en DB
+    let mappedVisionStatus = "OTHER";
+    let visionStatusOther = null;
+
+    switch (visionStatus) {
+      case "NORMAL":
+        mappedVisionStatus = "NORMAL";
+        break;
+
+      case "COLOR_VISION_DEFICIENCY":
+        mappedVisionStatus = "COLOR_VISION_DEFICIENCY";
+        break;
+
+      case "REFRACTIVE_CORRECTED":
+      case "REFRACTIVE_UNCORRECTED":
+      case "REFRACTIVE_ERROR":
+        mappedVisionStatus = "REFRACTIVE_ERROR";
+        visionStatusOther = visionStatus;
+        break;
+
+      case "PREFER_NOT_TO_SAY":
+        mappedVisionStatus = "OTHER";
+        visionStatusOther = "PREFER_NOT_TO_SAY";
+        break;
+
+      case "OTHER":
+      default:
+        mappedVisionStatus = "OTHER";
+        visionStatusOther = visionStatus ? String(visionStatus) : null;
+        break;
+    }
+
+    // 4) transaction
+    const result = await prisma.$transaction(async (tx) => {
+      const observerProfile = await tx.observerProfile.create({
+        data: {
+          age: parsedAge,
+          visionStatus: mappedVisionStatus,
+          visionOtherText: visionStatusOther, // ✅ le bon champ Prisma
+          consentAccepted: true,
+          expertiseType: mappedExpertiseType,
+        },
+      });
+
+      const session = await tx.session.create({
+        data: {
+          studyId: invite.studyId,
+          invitationId: invite.id,
+          observerId: observerProfile.id,
+          displayProfileJson: {
+            age: parsedAge,
+            visionStatus,
+            fatigueLevel,
+            expertiseType,
+            specialty,
+            experienceYears,
+            otherExpertise,
+            consentAccepted: true,
+          },
+        },
+      });
+
+      await tx.studyInvitation.update({
+        where: { id: invite.id },
+        data: { usedCount: { increment: 1 } },
+      });
+
+      return session;
     });
 
-    const session = await prisma.session.create({
-      data: {
-        studyId: invite.studyId,
-        observerId: createdObserver.id,
-        invitationId: invite.id,
-        displayProfileJson: observer,
-      },
-    });
-
-    await prisma.studyInvitation.update({
-      where: { id: invite.id },
-      data: { usedCount: { increment: 1 } },
-    });
-
-    return res.json({ sessionId: session.id });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ message: "Server error" });
+    return res.status(200).json({ sessionId: result.id });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Server error" });
   }
 });
-
 /**
  * POST /public/session/:sessionId/vision
  * - NE BLOQUE PAS (même FAIL on continue)
@@ -158,9 +322,7 @@ router.post("/session/:sessionId/vision", async (req, res) => {
 
 /**
  * GET /public/session/:sessionId/pairwise/next
- * - Renvoie 2 images DICOM (UIDs) + baseUrl DICOMweb
  */
-// GET /public/session/:sessionId/pairwise/next
 router.get("/session/:sessionId/pairwise/next", async (req, res) => {
   try {
     const { sessionId } = req.params;
@@ -170,7 +332,6 @@ router.get("/session/:sessionId/pairwise/next", async (req, res) => {
     });
     if (!session) return res.status(404).json({ message: "Session not found" });
 
-    // 1) Récupérer toutes les images DICOM prêtes pour cette study
     const rows = await prisma.studyImage.findMany({
       where: {
         studyId: session.studyId,
@@ -190,7 +351,6 @@ router.get("/session/:sessionId/pairwise/next", async (req, res) => {
       return res.status(400).json({ message: "Not enough DICOM-ready images" });
     }
 
-    // 2) Grouper par série
     const bySeries = new Map();
     for (const img of images) {
       const key = img.seriesInstanceUID;
@@ -198,7 +358,6 @@ router.get("/session/:sessionId/pairwise/next", async (req, res) => {
       bySeries.get(key).push(img);
     }
 
-    // Garder seulement les séries avec >= 2 images
     const eligibleSeries = [...bySeries.entries()].filter(
       ([, arr]) => arr.length >= 2,
     );
@@ -208,19 +367,15 @@ router.get("/session/:sessionId/pairwise/next", async (req, res) => {
         .json({ message: "No series has at least 2 instances" });
     }
 
-    // 3) Choisir une série au hasard
     const [seriesUID, seriesImgs] =
       eligibleSeries[Math.floor(Math.random() * eligibleSeries.length)];
 
-    // 4) Choisir 2 images différentes DANS cette série
-    // 4) Choisir 2 images différentes DANS cette série
     const left = seriesImgs[Math.floor(Math.random() * seriesImgs.length)];
     let right = seriesImgs[Math.floor(Math.random() * seriesImgs.length)];
     while (right.id === left.id) {
       right = seriesImgs[Math.floor(Math.random() * seriesImgs.length)];
     }
 
-    // 5) Créer la task
     const task = await prisma.pairwiseTask.create({
       data: {
         studyId: session.studyId,
@@ -231,19 +386,17 @@ router.get("/session/:sessionId/pairwise/next", async (req, res) => {
       include: { leftImage: true, rightImage: true },
     });
 
-    // 6) Réponse viewer-friendly
     return res.json({
       taskId: task.id,
       dicomWeb: {
         baseUrl:
           process.env.ORTHANC_DICOMWEB_BASEURL ||
-          "http://localhost:8042/dicom-web",
+          "http://localhost:4000/public/dicom-web",
       },
       seriesContext: {
         seriesInstanceUID: seriesUID,
-        studyInstanceUID: left.studyInstanceUID, // cohérent avec la série choisie
+        studyInstanceUID: left.studyInstanceUID,
       },
-
       left: {
         id: task.leftImage.id,
         studyInstanceUID: task.leftImage.studyInstanceUID,
@@ -276,8 +429,6 @@ router.get(
       if (!session)
         return res.status(404).json({ message: "Session not found" });
 
-      // On ne renvoie que les images DICOM appartenant à la study de la session
-      // et correspondant à la série demandée
       const rows = await prisma.studyImage.findMany({
         where: {
           studyId: session.studyId,
@@ -293,9 +444,6 @@ router.get(
       const instances = rows
         .map((r) => {
           const img = r.image;
-
-          // essaie de lire InstanceNumber depuis metadataJson
-          // (chez toi, tu stockes souvent MainDicomTags dedans)
           const meta = img.metadataJson || {};
           const instanceNumber =
             meta.InstanceNumber ?? meta["InstanceNumber"] ?? null;
@@ -308,7 +456,6 @@ router.get(
         })
         .filter((x) => !!x.sopInstanceUID);
 
-      // Tri (si instanceNumber existe)
       instances.sort((a, b) => {
         const ai =
           a.instanceNumber != null
@@ -325,7 +472,7 @@ router.get(
         dicomWeb: {
           baseUrl:
             process.env.ORTHANC_DICOMWEB_BASEURL ||
-            "http://localhost:8042/dicom-web",
+            "http://localhost:4000/public/dicom-web",
         },
         seriesInstanceUID: seriesUID,
         instances,
@@ -339,8 +486,6 @@ router.get(
 
 /**
  * POST /public/session/:sessionId/pairwise/answer
- * Body: { taskId, choice, responseTimeMs? }
- * choice: "LEFT_BETTER" | "RIGHT_BETTER" | "EQUAL"
  */
 router.post("/session/:sessionId/pairwise/answer", async (req, res) => {
   try {

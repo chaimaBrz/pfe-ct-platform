@@ -2,24 +2,72 @@ import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import "./PublicObserverForm.css";
 import bgImage from "../../assets/medical-bg.png";
-import { API_BASE_URL } from "../../config"; // adapte si besoin
+import { API_BASE_URL } from "../../config";
 
 export default function PublicObserverForm() {
   const { token } = useParams();
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
-    firstName: "",
-    lastName: "",
     age: "",
+
+    // ✅ ANONYMOUS profile fields
+    visionStatus: "PREFER_NOT_TO_SAY",
+    fatigueLevel: "MEDIUM",
+
     expertiseType: "RADIOLOGY", // RADIOLOGY | IMAGE_QUALITY | OTHER
-    experienceYears: "",
-    specialty: "CHEST",
+    specialty: "CHEST", // used only if expertiseType === RADIOLOGY
+    experienceYears: "", // optional numeric
+    otherExpertise: "", // used only if expertiseType === OTHER
+
     consentAccepted: false,
   });
 
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+
+  function update(name, value) {
+    setForm((f) => ({ ...f, [name]: value }));
+  }
+
+  const visionOptions = useMemo(
+    () => [
+      { value: "NORMAL", label: "Normal vision" },
+      {
+        value: "REFRACTIVE_CORRECTED",
+        label: "Refractive error (corrected: glasses/contacts)",
+      },
+      {
+        value: "REFRACTIVE_UNCORRECTED",
+        label: "Refractive error (uncorrected)",
+      },
+      {
+        value: "COLOR_VISION_DEFICIENCY",
+        label: "Color vision deficiency",
+      },
+      { value: "OTHER", label: "Other" },
+      { value: "PREFER_NOT_TO_SAY", label: "Prefer not to say" },
+    ],
+    [],
+  );
+
+  const fatigueOptions = useMemo(
+    () => [
+      { value: "LOW", label: "Low" },
+      { value: "MEDIUM", label: "Medium" },
+      { value: "HIGH", label: "High" },
+    ],
+    [],
+  );
+
+  const expertiseOptions = useMemo(
+    () => [
+      { value: "RADIOLOGY", label: "Radiology expert" },
+      { value: "IMAGE_QUALITY", label: "Medical imaging quality expert" },
+      { value: "OTHER", label: "Other" },
+    ],
+    [],
+  );
 
   const specialtyOptions = useMemo(
     () => [
@@ -29,36 +77,40 @@ export default function PublicObserverForm() {
       "EMERGENCY",
       "ONCOLOGY",
       "PEDIATRIC",
-      "NEURO",
+      "NEURORADIOLOGY",
       "OTHER",
     ],
     [],
   );
 
-  const expertiseOptions = useMemo(
-    () => [
-      { value: "RADIOLOGY", label: "Radiology" },
-      { value: "IMAGE_QUALITY", label: "Image quality" },
-      { value: "OTHER", label: "Other" },
-    ],
-    [],
-  );
-
-  function update(name, value) {
-    setForm((f) => ({ ...f, [name]: value }));
-  }
-
   function validate() {
-    if (!form.firstName.trim()) return "First name is required.";
-    if (!form.lastName.trim()) return "Last name is required.";
-
     const ageNum = Number(form.age);
-    if (!Number.isFinite(ageNum) || ageNum < 18 || ageNum > 120)
+    if (!Number.isFinite(ageNum) || ageNum < 18 || ageNum > 120) {
       return "Age must be a valid number (18–120).";
+    }
 
-    const expNum = Number(form.experienceYears);
-    if (!Number.isFinite(expNum) || expNum < 0 || expNum > 80)
-      return "Experience years must be a valid number (0–80).";
+    if (!form.visionStatus) return "Vision state is required.";
+    if (!form.fatigueLevel) return "Fatigue level is required.";
+    if (!form.expertiseType) return "Expertise is required.";
+
+    // If expertiseType is RADIOLOGY -> specialty required
+    if (form.expertiseType === "RADIOLOGY") {
+      if (!form.specialty) return "Specialty is required for radiology expert.";
+    }
+
+    // If expertiseType is OTHER -> otherExpertise required
+    if (form.expertiseType === "OTHER") {
+      if (!form.otherExpertise.trim())
+        return "Please specify your expertise/status.";
+    }
+
+    // experienceYears is optional BUT if filled -> must be valid
+    if (form.experienceYears !== "" && form.experienceYears != null) {
+      const years = Number(form.experienceYears);
+      if (!Number.isFinite(years) || years < 0 || years > 80) {
+        return "Years of experience must be a valid number (0–80).";
+      }
+    }
 
     if (!form.consentAccepted) return "You must accept consent to continue.";
     return "";
@@ -77,12 +129,24 @@ export default function PublicObserverForm() {
     const payload = {
       token,
       observer: {
-        firstName: form.firstName.trim(),
-        lastName: form.lastName.trim(),
         age: Number(form.age),
+
+        // ✅ enums (MUST match backend/prisma enums exactly)
+        visionStatus: form.visionStatus,
+        fatigueLevel: form.fatigueLevel,
+
         expertiseType: form.expertiseType,
-        specialty: form.specialty,
-        experienceYears: Number(form.experienceYears),
+        specialty:
+          form.expertiseType === "RADIOLOGY" ? form.specialty : undefined,
+
+        experienceYears:
+          form.experienceYears === "" ? null : Number(form.experienceYears),
+
+        otherExpertise:
+          form.expertiseType === "OTHER"
+            ? form.otherExpertise.trim()
+            : undefined,
+
         consentAccepted: Boolean(form.consentAccepted),
       },
     };
@@ -97,22 +161,19 @@ export default function PublicObserverForm() {
       });
 
       const text = await res.text();
-      if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
+      if (!res.ok) {
+        // show server message
+        throw new Error(text || `HTTP ${res.status}`);
+      }
 
       const json = JSON.parse(text);
 
-      // ✅ important: même clé partout
       localStorage.setItem("sessionId", json.sessionId);
       localStorage.setItem("publicToken", token);
 
-      // ➜ page vision (ishihara + contraste)
       navigate(`/public/${token}/vision`);
     } catch (e2) {
-      setErr(
-        typeof e2?.message === "string"
-          ? e2.message
-          : "Unable to start session.",
-      );
+      setErr(typeof e2?.message === "string" ? e2.message : "Server error");
     } finally {
       setLoading(false);
     }
@@ -144,71 +205,69 @@ export default function PublicObserverForm() {
             Observer <span>profile</span>
           </h1>
           <p className="form-desc">
-            Please fill in your profile information. This helps interpret
-            results by experience level. Data is recorded discreetly.
+            This profile is anonymous and helps interpret results. No vision
+            score will be displayed.
           </p>
 
           <div className="info-card">
             <div className="card-title">Privacy</div>
             <p className="card-text">
-              No vision score will be displayed. Answers are stored for research
-              purposes only.
+              Answers are stored for research purposes only. You may choose
+              “Prefer not to say”.
             </p>
           </div>
         </section>
 
         <aside className="form-right">
           <div className="panel-title">Profile form</div>
-          <div className="panel-sub">All fields are required</div>
+          <div className="panel-sub">
+            All fields are required unless marked optional
+          </div>
 
           <form onSubmit={onSubmit} className="panel-form">
+            <div className="field">
+              <label>Age</label>
+              <input
+                value={form.age}
+                onChange={(e) => update("age", e.target.value)}
+                placeholder="e.g., 35"
+                inputMode="numeric"
+              />
+            </div>
+
             <div className="grid-2">
               <div className="field">
-                <label>First name</label>
-                <input
-                  value={form.firstName}
-                  onChange={(e) => update("firstName", e.target.value)}
-                  placeholder="e.g., Sarah"
-                  autoComplete="given-name"
-                />
+                <label>Vision state</label>
+                <select
+                  value={form.visionStatus}
+                  onChange={(e) => update("visionStatus", e.target.value)}
+                >
+                  {visionOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="field">
-                <label>Last name</label>
-                <input
-                  value={form.lastName}
-                  onChange={(e) => update("lastName", e.target.value)}
-                  placeholder="e.g., Martin"
-                  autoComplete="family-name"
-                />
+                <label>Fatigue level</label>
+                <select
+                  value={form.fatigueLevel}
+                  onChange={(e) => update("fatigueLevel", e.target.value)}
+                >
+                  {fatigueOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
             <div className="grid-2">
               <div className="field">
-                <label>Age</label>
-                <input
-                  value={form.age}
-                  onChange={(e) => update("age", e.target.value)}
-                  placeholder="e.g., 35"
-                  inputMode="numeric"
-                />
-              </div>
-
-              <div className="field">
-                <label>Years of experience</label>
-                <input
-                  value={form.experienceYears}
-                  onChange={(e) => update("experienceYears", e.target.value)}
-                  placeholder="e.g., 8"
-                  inputMode="numeric"
-                />
-              </div>
-            </div>
-
-            <div className="grid-2">
-              <div className="field">
-                <label>Expertise type</label>
+                <label>Expertise</label>
                 <select
                   value={form.expertiseType}
                   onChange={(e) => update("expertiseType", e.target.value)}
@@ -221,19 +280,47 @@ export default function PublicObserverForm() {
                 </select>
               </div>
 
+              {form.expertiseType === "RADIOLOGY" ? (
+                <div className="field">
+                  <label>Specialty</label>
+                  <select
+                    value={form.specialty}
+                    onChange={(e) => update("specialty", e.target.value)}
+                  >
+                    {specialtyOptions.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div className="field">
+                  <label>Specialty</label>
+                  <input value="—" disabled style={{ opacity: 0.7 }} readOnly />
+                </div>
+              )}
+            </div>
+
+            {form.expertiseType === "OTHER" && (
               <div className="field">
-                <label>Specialty</label>
-                <select
-                  value={form.specialty}
-                  onChange={(e) => update("specialty", e.target.value)}
-                >
-                  {specialtyOptions.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
+                <label>Please specify</label>
+                <input
+                  value={form.otherExpertise}
+                  onChange={(e) => update("otherExpertise", e.target.value)}
+                  placeholder="e.g., student, engineer..."
+                />
               </div>
+            )}
+
+            <div className="field">
+              <label>Years of experience (optional)</label>
+              <input
+                value={form.experienceYears}
+                onChange={(e) => update("experienceYears", e.target.value)}
+                placeholder="e.g., 5"
+                inputMode="numeric"
+              />
             </div>
 
             <label className="consent-row">

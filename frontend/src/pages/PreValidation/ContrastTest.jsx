@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import "./ContrastTest.css";
 
 // Non-ambiguous letters
 const LETTERS = ["C", "E", "F", "L", "P", "T", "U", "V", "H"];
@@ -47,7 +48,6 @@ export default function ContrastTest({ totalRounds = 16, onDone }) {
   }
 
   function finishTest(nextCorrect) {
-    // Score between 0 and 1
     const contrastScore = Number((nextCorrect / totalRounds).toFixed(4));
     onDone?.({ contrastScore });
   }
@@ -70,7 +70,7 @@ export default function ContrastTest({ totalRounds = 16, onDone }) {
     nextQuestion();
   }
 
-  // Keyboard support (optional but nice)
+  // Keyboard support
   useEffect(() => {
     function onKeyDown(e) {
       if (e.key === "ArrowUp") answer(0);
@@ -85,64 +85,48 @@ export default function ContrastTest({ totalRounds = 16, onDone }) {
   }, [orientation, round, correct]);
 
   return (
-    <div style={{ padding: 24, maxWidth: 780 }}>
-      <h2 style={{ marginBottom: 6 }}>Contrast Sensitivity Test</h2>
-      <p style={{ marginTop: 0 }}>
-        Identify the orientation of the letter as quickly and accurately as
-        possible.
-      </p>
+    <div className="ct-contrast">
+      <div className="ct-contrast-inner">
+        <h2 className="ct-title">Contrast Sensitivity Test</h2>
+        <p className="ct-desc">
+          Identify the orientation of the letter as quickly and accurately as
+          possible.
+        </p>
 
-      <div style={{ marginTop: 8, marginBottom: 14 }}>
-        <strong>Question {round}</strong> of <strong>{totalRounds}</strong>
-      </div>
+        <div className="ct-progress">
+          <strong>Question {round}</strong> of <strong>{totalRounds}</strong>
+        </div>
 
-      <div
-        style={{
-          background: "#fff",
-          border: "1px solid #e5e5e5",
-          borderRadius: 12,
-          height: 260,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          marginBottom: 16,
-        }}
-      >
-        <div
-          style={{
-            fontSize: 110,
-            fontWeight: 800,
-            color: `rgb(${gray}, ${gray}, ${gray})`,
-            transform: `rotate(${orientation}deg)`,
-            userSelect: "none",
-            lineHeight: 1,
-          }}
-        >
-          {letter}
+        <div className="ct-card">
+          <div className="ct-stimulus">
+            <div
+              className="ct-letter"
+              style={{
+                color: `rgb(${gray}, ${gray}, ${gray})`,
+                transform: `rotate(${orientation}deg)`,
+              }}
+            >
+              {letter}
+            </div>
+          </div>
+
+          <div className="ct-actions">
+            {ORIENTATIONS.map((o) => (
+              <button
+                key={o.value}
+                className="ct-btn"
+                onClick={() => answer(o.value)}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+
+          <p className="ct-note">
+            The letter, rotation and contrast level change randomly each time.
+          </p>
         </div>
       </div>
-
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        {ORIENTATIONS.map((o) => (
-          <button
-            key={o.value}
-            onClick={() => answer(o.value)}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 10,
-              border: "1px solid #ddd",
-              background: "white",
-              cursor: "pointer",
-            }}
-          >
-            {o.label}
-          </button>
-        ))}
-      </div>
-
-      <p style={{ marginTop: 14, color: "#666" }}>
-        The letter, rotation and contrast level change randomly each time.
-      </p>
     </div>
   );
 }
