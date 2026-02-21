@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { API_BASE_URL } from "../../config";
 import "./PublicPairwise.css";
 import bgImage from "../../assets/medical-bg.png";
+import MPRViewer from "../../components/MPRViewer";
 
 function dicomRenderedUrl(img) {
   if (!img) return "";
@@ -24,21 +25,31 @@ export default function PublicPairwise() {
   const [left, setLeft] = useState(null);
   const [right, setRight] = useState(null);
 
+  // ✅ MPR custom (ton composant)
+  const [mprMode, setMprMode] = useState(false);
+
+  // ✅ OHIF modal (same page)
+  const [showOhif, setShowOhif] = useState(false);
+  const [ohifSide, setOhifSide] = useState("left"); // "left" | "right"
+
   const startRef = useRef(Date.now());
 
-  // ✅ Ouvre OHIF avec la route correcte
-  function openOhif(studyUID, seriesUID) {
-    const base = "http://localhost:3001";
-    const ds = "ORTHANC_VIA_BACKEND"; // DOIT matcher window.config.dataSources[].sourceName
+  function buildOhifUrl(img) {
+    if (!img?.studyInstanceUID) return "";
+    const base = "http://localhost:3000"; // ✅ ton OHIF est sur 3000
+    const ds = "ORTHANC_VIA_BACKEND"; // ✅ doit matcher default.js
 
     const params = new URLSearchParams({
-      StudyInstanceUIDs: studyUID,
-      ...(seriesUID ? { SeriesInstanceUIDs: seriesUID } : {}),
-      dataSources: ds, // ✅ OHIF v3
+      StudyInstanceUIDs: img.studyInstanceUID,
+      ...(img.seriesInstanceUID
+        ? { SeriesInstanceUIDs: img.seriesInstanceUID }
+        : {}),
+      dataSources: ds,
     });
 
-    window.open(`${base}/viewer?${params.toString()}`, "_blank");
+    return `${base}/viewer?${params.toString()}`;
   }
+
   async function loadNext() {
     setError("");
 
@@ -107,7 +118,7 @@ export default function PublicPairwise() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ✅ 1) pas de session → message clair
+  // --------- UI states ----------
   if (!sessionId || !token) {
     return (
       <div
@@ -115,7 +126,6 @@ export default function PublicPairwise() {
         style={{ backgroundImage: `url(${bgImage})` }}
       >
         <div className="pairwise-overlay" />
-
         <header className="pairwise-header">
           <div className="logo">
             <div className="logo-circle">CT</div>
@@ -124,7 +134,6 @@ export default function PublicPairwise() {
               <div className="logo-sub">Observer portal</div>
             </div>
           </div>
-
           <div className="top-badges">
             <span className="badge">Anonymous</span>
             <span className="badge">No account</span>
@@ -142,7 +151,6 @@ export default function PublicPairwise() {
               again.
             </div>
           </section>
-
           <section className="pairwise-right">
             <div className="pairwise-card">
               <div className="pairwise-imgEmpty">Nothing to display.</div>
@@ -157,7 +165,6 @@ export default function PublicPairwise() {
     );
   }
 
-  // ✅ 2) loading initial
   if (loading && !left && !right) {
     return (
       <div
@@ -165,7 +172,6 @@ export default function PublicPairwise() {
         style={{ backgroundImage: `url(${bgImage})` }}
       >
         <div className="pairwise-overlay" />
-
         <header className="pairwise-header">
           <div className="logo">
             <div className="logo-circle">CT</div>
@@ -174,7 +180,6 @@ export default function PublicPairwise() {
               <div className="logo-sub">Observer portal</div>
             </div>
           </div>
-
           <div className="top-badges">
             <span className="badge">Anonymous</span>
             <span className="badge">No account</span>
@@ -189,7 +194,6 @@ export default function PublicPairwise() {
             </h1>
             <p className="pairwise-desc">Loading the next comparison…</p>
           </section>
-
           <section className="pairwise-right">
             <div className="pairwise-card">
               <div className="pairwise-imgEmpty">Loading…</div>
@@ -204,7 +208,9 @@ export default function PublicPairwise() {
     );
   }
 
-  // ✅ 3) UI principale
+  const ohifImg = ohifSide === "left" ? left : right;
+  const ohifUrl = buildOhifUrl(ohifImg);
+
   return (
     <div
       className="pairwise-page"
@@ -220,7 +226,6 @@ export default function PublicPairwise() {
             <div className="logo-sub">Observer portal</div>
           </div>
         </div>
-
         <div className="top-badges">
           <span className="badge">Anonymous</span>
           <span className="badge">No account</span>
@@ -236,7 +241,7 @@ export default function PublicPairwise() {
 
           <p className="pairwise-desc">
             Compare the two CT images and choose which one has better perceived
-            quality. Use “Equal” only if they look comparable.
+            quality.
           </p>
 
           {error && <div className="pairwise-error">{error}</div>}
@@ -248,33 +253,48 @@ export default function PublicPairwise() {
 
         <section className="pairwise-right">
           <div className="pairwise-card">
-            <div className="pairwise-grid">
-              <div className="pairwise-imgBlock">
-                <div className="pairwise-imgLabel">Left</div>
-                {left ? (
-                  <img
-                    className="pairwise-img"
-                    src={dicomRenderedUrl(left)}
-                    alt="left"
-                  />
-                ) : (
-                  <div className="pairwise-imgEmpty">No image</div>
-                )}
+            {/* Pairwise images OR your custom MPR */}
+            {mprMode ? (
+              <div>
+                <div style={{ marginBottom: 10, fontWeight: 600 }}>
+                  MPR Viewer (Axial / Sagittal / Coronal)
+                </div>
+                <MPRViewer
+                  apiBaseUrl={API_BASE_URL}
+                  sessionId={sessionId}
+                  studyInstanceUID={left?.studyInstanceUID}
+                  seriesInstanceUID={left?.seriesInstanceUID}
+                />
               </div>
+            ) : (
+              <div className="pairwise-grid">
+                <div className="pairwise-imgBlock">
+                  <div className="pairwise-imgLabel">Left</div>
+                  {left ? (
+                    <img
+                      className="pairwise-img"
+                      src={dicomRenderedUrl(left)}
+                      alt="left"
+                    />
+                  ) : (
+                    <div className="pairwise-imgEmpty">No image</div>
+                  )}
+                </div>
 
-              <div className="pairwise-imgBlock">
-                <div className="pairwise-imgLabel">Right</div>
-                {right ? (
-                  <img
-                    className="pairwise-img"
-                    src={dicomRenderedUrl(right)}
-                    alt="right"
-                  />
-                ) : (
-                  <div className="pairwise-imgEmpty">No image</div>
-                )}
+                <div className="pairwise-imgBlock">
+                  <div className="pairwise-imgLabel">Right</div>
+                  {right ? (
+                    <img
+                      className="pairwise-img"
+                      src={dicomRenderedUrl(right)}
+                      alt="right"
+                    />
+                  ) : (
+                    <div className="pairwise-imgEmpty">No image</div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="pairwise-actions">
               <button
@@ -312,12 +332,35 @@ export default function PublicPairwise() {
               <button
                 className="btn btnSoft"
                 disabled={!left?.studyInstanceUID}
-                onClick={() =>
-                  openOhif(left?.studyInstanceUID, left?.seriesInstanceUID)
-                }
-                title="Open the selected series in OHIF"
+                onClick={() => setMprMode((v) => !v)}
+                title="Open your custom MPR viewer in the same page"
               >
-                Open in OHIF (detail)
+                {mprMode ? "Back to Pairwise" : "View ITK-SNAP (MPR custom)"}
+              </button>
+
+              {/* ✅ OHIF DETAIL LEFT/RIGHT in same page */}
+              <button
+                className="btn btnSoft"
+                disabled={!left?.studyInstanceUID}
+                onClick={() => {
+                  setOhifSide("left");
+                  setShowOhif(true);
+                }}
+                title="Open LEFT series in OHIF (same page)"
+              >
+                Detail Left (OHIF)
+              </button>
+
+              <button
+                className="btn btnSoft"
+                disabled={!right?.studyInstanceUID}
+                onClick={() => {
+                  setOhifSide("right");
+                  setShowOhif(true);
+                }}
+                title="Open RIGHT series in OHIF (same page)"
+              >
+                Detail Right (OHIF)
               </button>
             </div>
 
@@ -329,6 +372,29 @@ export default function PublicPairwise() {
       <footer className="pairwise-footer">
         CT Image Evaluation Platform – Public observer access
       </footer>
+
+      {/* ✅ MODAL OHIF (same page) */}
+      {showOhif && (
+        <div className="ohif-modal">
+          <div className="ohif-modal-header">
+            <div>OHIF Viewer — {ohifSide.toUpperCase()}</div>
+            <button className="btn btnSoft" onClick={() => setShowOhif(false)}>
+              Close
+            </button>
+          </div>
+
+          {!ohifUrl ? (
+            <div className="ohif-empty">No series selected.</div>
+          ) : (
+            <iframe
+              title="ohif"
+              className="ohif-iframe"
+              src={ohifUrl}
+              allow="fullscreen"
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }
