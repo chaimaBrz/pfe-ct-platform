@@ -130,23 +130,8 @@ router.get("/study/:token", async (req, res) => {
 
 /**
  * POST /public/session/start
- * Body:
- * {
- *   token,
- *   observer: {
- *     age,
- *     visionStatus,
- *     fatigueLevel,
- *     expertiseType,
- *     specialty?,          // si expertiseType === RADIOLOGY
- *     experienceYears?,    // optionnel
- *     otherExpertise?      // si expertiseType === OTHER
- *     consentAccepted
- *   }
- * }
  * -> { sessionId }
  */
-// ✅ Remplace le handler de POST /public/session/start par celui-ci
 router.post("/session/start", async (req, res) => {
   try {
     const body = req.body || {};
@@ -155,7 +140,7 @@ router.post("/session/start", async (req, res) => {
 
     const {
       age,
-      visionStatus, // vient du front
+      visionStatus,
       fatigueLevel,
       expertiseType,
       specialty,
@@ -166,13 +151,13 @@ router.post("/session/start", async (req, res) => {
 
     const expertiseTypeMap = {
       RADIOLOGY: "RADIOLOGY",
-      IMAGE_QUALITY: "MEDICAL_IMAGING", // front envoie IMAGE_QUALITY
-      MEDICAL_IMAGING: "MEDICAL_IMAGING", // au cas où
+      IMAGE_QUALITY: "MEDICAL_IMAGING",
+      MEDICAL_IMAGING: "MEDICAL_IMAGING",
       OTHER: "OTHER",
     };
 
     const mappedExpertiseType = expertiseTypeMap[expertiseType] || "OTHER";
-    // 1) validations
+
     const parsedAge = Number(String(age ?? "").trim());
     if (!Number.isFinite(parsedAge) || parsedAge <= 0) {
       return res.status(400).json({ message: "Invalid age" });
@@ -184,7 +169,6 @@ router.post("/session/start", async (req, res) => {
       return res.status(400).json({ message: "Missing token" });
     }
 
-    // 2) vérifier token invitation
     const invite = await prisma.studyInvitation.findUnique({
       where: { token },
       include: { study: true },
@@ -196,7 +180,6 @@ router.post("/session/start", async (req, res) => {
     if (invite.maxUses != null && invite.usedCount >= invite.maxUses)
       return res.status(410).json({ message: "Token max uses reached" });
 
-    // 3) mapping visionStatus (front) -> valeurs sûres en DB
     let mappedVisionStatus = "OTHER";
     let visionStatusOther = null;
 
@@ -204,23 +187,19 @@ router.post("/session/start", async (req, res) => {
       case "NORMAL":
         mappedVisionStatus = "NORMAL";
         break;
-
       case "COLOR_VISION_DEFICIENCY":
         mappedVisionStatus = "COLOR_VISION_DEFICIENCY";
         break;
-
       case "REFRACTIVE_CORRECTED":
       case "REFRACTIVE_UNCORRECTED":
       case "REFRACTIVE_ERROR":
         mappedVisionStatus = "REFRACTIVE_ERROR";
         visionStatusOther = visionStatus;
         break;
-
       case "PREFER_NOT_TO_SAY":
         mappedVisionStatus = "OTHER";
         visionStatusOther = "PREFER_NOT_TO_SAY";
         break;
-
       case "OTHER":
       default:
         mappedVisionStatus = "OTHER";
@@ -228,13 +207,12 @@ router.post("/session/start", async (req, res) => {
         break;
     }
 
-    // 4) transaction
     const result = await prisma.$transaction(async (tx) => {
       const observerProfile = await tx.observerProfile.create({
         data: {
           age: parsedAge,
           visionStatus: mappedVisionStatus,
-          visionOtherText: visionStatusOther, // ✅ le bon champ Prisma
+          visionOtherText: visionStatusOther,
           consentAccepted: true,
           expertiseType: mappedExpertiseType,
         },
@@ -272,9 +250,9 @@ router.post("/session/start", async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 });
+
 /**
  * POST /public/session/:sessionId/vision
- * - NE BLOQUE PAS (même FAIL on continue)
  */
 router.post("/session/:sessionId/vision", async (req, res) => {
   try {
@@ -509,6 +487,140 @@ router.post("/session/:sessionId/pairwise/answer", async (req, res) => {
   } catch (e) {
     console.error(e);
     res.status(500).json({ message: "Server error" });
+  }
+});
+
+/* ============================================================
+   ✅ RATING ROUTES
+   ============================================================ */
+
+/**
+ * GET /public/session/:sessionId/rating/next
+ */
+router.get("/session/:sessionId/rating/next", async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    const session = await prisma.session.findUnique({
+      where: { id: sessionId },
+      include: { study: { include: { protocol: true } } },
+    });
+    if (!session) return res.status(404).json({ message: "Session not found" });
+
+    if (session.study.protocol.mode !== "RATING") {
+      return res.status(400).json({ message: "Study is not in RATING mode" });
+    }
+
+    const rows = await prisma.studyImage.findMany({
+      where: {
+        studyId: session.studyId,
+        image: {
+          format: "DICOM",
+          studyInstanceUID: { not: null },
+          seriesInstanceUID: { not: null },
+          sopInstanceUID: { not: null },
+        },
+      },
+      include: { image: true },
+    });
+
+    const images = rows.map((r) => r.image);
+    if (images.length === 0) {
+      return res.status(400).json({ message: "No DICOM-ready images" });
+    }
+
+    const done = await prisma.ratingEvaluation.findMany({
+      where: { sessionId },
+      include: { task: true },
+    });
+
+    const doneIds = new Set(done.map((d) => d.task.imageId));
+    const remaining = images.filter((img) => !doneIds.has(img.id));
+
+    if (remaining.length === 0) {
+      return res.json({ done: true, message: "Rating completed" });
+    }
+
+    const picked = remaining[Math.floor(Math.random() * remaining.length)];
+
+    const task = await prisma.ratingTask.upsert({
+      where: {
+        studyId_imageId: { studyId: session.studyId, imageId: picked.id },
+      },
+      create: {
+        studyId: session.studyId,
+        imageId: picked.id,
+        randomSeed: String(Date.now()),
+      },
+      update: {},
+      include: { image: true },
+    });
+
+    return res.json({
+      taskId: task.id,
+      image: {
+        id: task.image.id,
+        studyInstanceUID: task.image.studyInstanceUID,
+        seriesInstanceUID: task.image.seriesInstanceUID,
+        sopInstanceUID: task.image.sopInstanceUID,
+      },
+      dicomWeb: {
+        baseUrl:
+          process.env.ORTHANC_DICOMWEB_BASEURL ||
+          "http://localhost:4000/public/dicom-web",
+      },
+    });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+/**
+ * POST /public/session/:sessionId/rating/answer
+ */
+router.post("/session/:sessionId/rating/answer", async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { taskId, score, comment, responseTimeMs } = req.body || {};
+
+    if (!taskId) return res.status(400).json({ message: "Missing taskId" });
+
+    const s = Number(score);
+    if (!Number.isFinite(s) || s < 1 || s > 5) {
+      return res.status(400).json({ message: "Score must be between 1 and 5" });
+    }
+
+    const session = await prisma.session.findUnique({
+      where: { id: sessionId },
+      include: { study: { include: { protocol: true } } },
+    });
+
+    if (!session) return res.status(404).json({ message: "Session not found" });
+
+    if (session.study.protocol.mode !== "RATING") {
+      return res.status(400).json({ message: "Study is not in RATING mode" });
+    }
+
+    const row = await prisma.ratingEvaluation.create({
+      data: {
+        sessionId,
+        taskId,
+        score: s,
+        comment: comment ?? null,
+        responseTimeMs: responseTimeMs ?? null,
+      },
+    });
+
+    return res.json({ ok: true, ratingId: row.id });
+  } catch (e) {
+    console.error(e);
+
+    if (String(e.code) === "P2002") {
+      return res.status(409).json({ message: "Already rated" });
+    }
+
+    return res.status(500).json({ message: "Server error" });
   }
 });
 

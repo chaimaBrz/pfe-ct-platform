@@ -1,29 +1,49 @@
 ﻿require("dotenv").config();
+
 const crypto = require("crypto");
 const prisma = require("../src/db/prisma");
 
-(async () => {
-  const study = await prisma.study.findFirst();
-  if (!study) {
-    console.log("❌ Aucune Study trouvée. Lance bootstrap-dev.js d'abord.");
+async function main() {
+  const studyId = process.argv[2];
+
+  if (!studyId) {
+    console.error("❌ Usage:");
+    console.error("node scripts/create-invite.js <studyId>");
     process.exit(1);
   }
 
-  const token = crypto.randomBytes(24).toString("hex");
-
-  const inv = await prisma.studyInvitation.create({
-    data: { token, studyId: study.id },
+  // ✅ chercher EXACTEMENT le study demandé
+  const study = await prisma.study.findUnique({
+    where: { id: studyId },
+    include: { protocol: true },
   });
 
-  console.log("✅ TOKEN:", inv.token);
-  console.log("✅ Study:", study.id, study.name);
+  if (!study) {
+    console.error("❌ Study not found");
+    process.exit(1);
+  }
 
-  await prisma.$disconnect();
-  process.exit(0);
-})().catch(async (e) => {
-  console.error(e);
-  try {
-    await prisma.$disconnect();
-  } catch (_) {}
-  process.exit(1);
-});
+  // ✅ génération token propre
+  const token = crypto.randomBytes(24).toString("hex");
+
+  const invite = await prisma.studyInvitation.create({
+    data: {
+      token,
+      studyId: study.id,
+    },
+  });
+
+  console.log("✅ TOKEN:", invite.token);
+  console.log("✅ Study:", study.id, "-", study.name);
+  console.log("✅ Mode:", study.protocol.mode);
+
+  console.log("\n🔗 LINKS:");
+  console.log(
+    `Pairwise: http://localhost:5173/public/${invite.token}/pairwise`,
+  );
+  console.log(`Rating:   http://localhost:5173/public/${invite.token}/rating`);
+}
+
+main()
+  .catch(console.error)
+  .finally(() => prisma.$disconnect());

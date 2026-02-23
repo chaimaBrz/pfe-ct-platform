@@ -6,6 +6,10 @@ datasource db {
   provider = "postgresql"
 }
 
+/* =========================
+   USERS
+========================= */
+
 model User {
   id            String    @id @default(uuid())
   email         String    @unique
@@ -16,23 +20,32 @@ model User {
   sessions      Session[]
 }
 
+/* =========================
+   OBSERVER PROFILE
+========================= */
+
 model ObserverProfile {
-  id                 String              @id @default(uuid())
+  id                 String           @id @default(uuid())
   firstName          String?
   lastName           String?
   age                Int?
   expertiseType      ExpertiseType
   specialty          RadiologySpecialty?
   experienceYears    Int?
-  consentAccepted    Boolean             @default(false)
-  createdAt          DateTime            @default(now())
-  fatigueLevel       FatigueLevel        @default(LOW)
+  consentAccepted    Boolean          @default(false)
+  createdAt          DateTime         @default(now())
+  fatigueLevel       FatigueLevel     @default(LOW)
   otherExpertiseText String?
-  visionCorrection   VisionCorrection    @default(NONE)
+  visionCorrection   VisionCorrection @default(NONE)
   visionOtherText    String?
-  visionStatus       VisionStatus        @default(NORMAL)
-  sessions           Session[]
+  visionStatus       VisionStatus     @default(NORMAL)
+
+  sessions Session[]
 }
+
+/* =========================
+   PROTOCOL / STUDY
+========================= */
 
 model Protocol {
   id             String    @id @default(uuid())
@@ -41,52 +54,75 @@ model Protocol {
   mode           EvalMode
   parametersJson Json?
   createdAt      DateTime  @default(now())
-  studies        Study[]
+
+  studies Study[]
 }
 
 model Study {
-  id            String            @id @default(uuid())
+  id            String   @id @default(uuid())
   name          String
   studyType     StudyType
-  status        String            @default("DRAFT")
-  createdAt     DateTime          @default(now())
-  protocolId    String
-  pairwiseTasks PairwiseTask[]
+  status        String   @default("DRAFT")
+  createdAt     DateTime @default(now())
+
+  protocolId String
+  protocol   Protocol @relation(fields: [protocolId], references: [id])
+
   sessions      Session[]
-  protocol      Protocol          @relation(fields: [protocolId], references: [id])
-  studyImages   StudyImage[]
   invitations   StudyInvitation[]
+  studyImages   StudyImage[]
+
+  pairwiseTasks PairwiseTask[]
+  ratingTasks   RatingTask[]
 }
 
+/* =========================
+   INVITATION
+========================= */
+
 model StudyInvitation {
-  id        String    @id @default(uuid())
-  token     String    @unique
+  id        String   @id @default(uuid())
+  token     String   @unique @default(uuid())  // ✅ auto token
   studyId   String
   expiresAt DateTime?
   maxUses   Int?
-  usedCount Int       @default(0)
-  createdAt DateTime  @default(now())
+  usedCount Int      @default(0)
+  createdAt DateTime @default(now())
   sessions  Session[]
-  study     Study     @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  study     Study    @relation(fields: [studyId], references: [id], onDelete: Cascade)
 }
 
+/* =========================
+   SESSION
+========================= */
+
 model Session {
-  id                  String               @id @default(uuid())
-  status              SessionStatus        @default(IN_PROGRESS)
-  startedAt           DateTime             @default(now())
-  endedAt             DateTime?
-  displayProfileJson  Json?
-  studyId             String
-  userId              String?
-  invitationId        String?
-  observerId          String?
+  id         String        @id @default(uuid())
+  status     SessionStatus @default(IN_PROGRESS)
+  startedAt  DateTime      @default(now())
+  endedAt    DateTime?
+
+  displayProfileJson Json?
+
+  studyId      String
+  invitationId String?
+  observerId   String?
+  userId       String?
+
+  study      Study             @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  invitation StudyInvitation?  @relation(fields: [invitationId], references: [id])
+  observer   ObserverProfile?  @relation(fields: [observerId], references: [id], onDelete: Cascade)
+  user       User?             @relation(fields: [userId], references: [id])
+
+  visionTests VisionTestResult[]
+
   pairwiseEvaluations PairwiseEvaluation[]
-  invitation          StudyInvitation?     @relation(fields: [invitationId], references: [id])
-  observer            ObserverProfile?     @relation(fields: [observerId], references: [id], onDelete: Cascade)
-  study               Study                @relation(fields: [studyId], references: [id], onDelete: Cascade)
-  user                User?                @relation(fields: [userId], references: [id])
-  visionTests         VisionTestResult[]
+  ratingEvaluations   RatingEvaluation[]
 }
+
+/* =========================
+   VISION TEST
+========================= */
 
 model VisionTestResult {
   id            String   @id @default(uuid())
@@ -96,66 +132,125 @@ model VisionTestResult {
   status        PassFail
   testedAt      DateTime @default(now())
   details       Json?
-  sessionId     String
-  session       Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  sessionId String
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId, testedAt])
 }
 
+/* =========================
+   IMAGE STORAGE
+========================= */
+
 model ImageAsset {
-  id                String         @id @default(uuid())
-  createdAt         DateTime       @default(now())
+  id                String   @id @default(uuid())
+  createdAt         DateTime @default(now())
   format            ImageFormat
   label             String?
   metadataJson      Json?
   uri               String
+
+  studyInstanceUID  String?
   seriesInstanceUID String?
   sopInstanceUID    String?
-  studyInstanceUID  String?
-  asLeftInTasks     PairwiseTask[] @relation("LeftImage")
-  asRightInTasks    PairwiseTask[] @relation("RightImage")
-  studyImages       StudyImage[]
+
+  studyImages StudyImage[]
+
+  asLeftInTasks  PairwiseTask[] @relation("LeftImage")
+  asRightInTasks PairwiseTask[] @relation("RightImage")
+
+  ratingTasks RatingTask[]
 }
 
 model StudyImage {
-  id      String     @id @default(uuid())
+  id      String @id @default(uuid())
   studyId String
   imageId String
-  addedAt DateTime   @default(now())
-  image   ImageAsset @relation(fields: [imageId], references: [id], onDelete: Cascade)
-  study   Study      @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  addedAt DateTime @default(now())
+
+  study Study @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  image ImageAsset @relation(fields: [imageId], references: [id], onDelete: Cascade)
 
   @@unique([studyId, imageId])
   @@index([studyId])
   @@index([imageId])
 }
 
+/* =========================
+   PAIRWISE MODE
+========================= */
+
 model PairwiseTask {
-  id           String               @id @default(uuid())
+  id           String   @id @default(uuid())
   studyId      String
   leftImageId  String
   rightImageId String
   randomSeed   String?
-  createdAt    DateTime             @default(now())
-  evaluations  PairwiseEvaluation[]
-  leftImage    ImageAsset           @relation("LeftImage", fields: [leftImageId], references: [id])
-  rightImage   ImageAsset           @relation("RightImage", fields: [rightImageId], references: [id])
-  study        Study                @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+
+  study      Study      @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  leftImage  ImageAsset @relation("LeftImage", fields: [leftImageId], references: [id])
+  rightImage ImageAsset @relation("RightImage", fields: [rightImageId], references: [id])
+
+  evaluations PairwiseEvaluation[]
 }
 
 model PairwiseEvaluation {
-  id             String       @id @default(uuid())
+  id             String   @id @default(uuid())
   sessionId      String
   taskId         String
   choice         PairChoice
   responseTimeMs Int?
-  createdAt      DateTime     @default(now())
-  session        Session      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  task           PairwiseTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+
+  session Session      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  task    PairwiseTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([sessionId, createdAt])
   @@index([taskId, createdAt])
 }
+
+/* =========================
+   ✅ RATING MODE
+========================= */
+
+model RatingTask {
+  id         String   @id @default(uuid())
+  studyId    String
+  imageId    String
+  randomSeed String?
+  createdAt  DateTime @default(now())
+
+  study Study      @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  image ImageAsset @relation(fields: [imageId], references: [id], onDelete: Cascade)
+
+  evaluations RatingEvaluation[]
+
+  @@unique([studyId, imageId])
+  @@index([studyId, createdAt])
+}
+
+model RatingEvaluation {
+  id             String   @id @default(uuid())
+  sessionId      String
+  taskId         String
+  score          Int
+  comment        String?
+  responseTimeMs Int?
+  createdAt      DateTime @default(now())
+
+  session Session    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  task    RatingTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, taskId])
+  @@index([sessionId, createdAt])
+  @@index([taskId, createdAt])
+}
+
+/* =========================
+   ENUMS
+========================= */
 
 enum Role {
   ADMIN
