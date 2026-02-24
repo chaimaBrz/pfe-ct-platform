@@ -8,6 +8,7 @@ import PublicProtocol from "./pages/public/PublicProtocol.jsx";
 import PublicPairwise from "./pages/public/PublicPairwise.jsx";
 import PublicRating from "./pages/public/PublicRating.jsx";
 import PreValidation from "./pages/PreValidation/PreValidation.jsx";
+import Results from "./pages/admin/Results.jsx";
 
 /* ================= ADMIN ================= */
 import Login from "./pages/admin/Login.jsx";
@@ -28,6 +29,7 @@ export default function App() {
         <Route path="/admin/studies" element={<StudiesList />} />
         <Route path="/admin/studies/new" element={<CreateStudy />} />
         <Route path="/admin/invitations" element={<Invitations />} />
+        <Route path="/admin/results" element={<Results />} />
 
         {/* ================= PUBLIC ================= */}
         <Route path="/public/:token" element={<PublicLanding />} />

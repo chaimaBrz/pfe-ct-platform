@@ -234,3 +234,62 @@
   background: rgba(254, 226, 226, 0.8);
   color: #991b1b;
 }
+
+.admin-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 14px;
+  margin: 20px 0;
+}
+
+.stat-card {
+  background: rgba(255, 255, 255, 0.75);
+  border-radius: 18px;
+  padding: 14px;
+  border: 1px solid rgba(147, 197, 253, 0.35);
+  text-align: center;
+}
+
+.stat-card h3 {
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+  color: rgba(15, 23, 42, 0.6);
+}
+
+.stat-card p {
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: #2563eb;
+}
+.images-preview {
+  margin-top: 20px;
+}
+
+.preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.preview-grid img {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(147, 197, 253, 0.3);
+}
+
+.table-button {
+  border: none;
+  padding: 6px 10px;
+  border-radius: 10px;
+  margin-right: 6px;
+  cursor: pointer;
+  font-weight: 700;
+
+  background: rgba(219, 234, 254, 0.8);
+  color: #2563eb;
+}
+
+.table-button:hover {
+  background: rgba(191, 219, 254, 0.9);
+}
