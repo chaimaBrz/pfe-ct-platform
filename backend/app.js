@@ -11,6 +11,7 @@ const sessionRoutes = require("./src/routes/session.routes");
 const imageRoutes = require("./src/routes/image.routes");
 const pairwiseRoutes = require("./src/routes/pairwise.routes");
 const publicRoutes = require("./src/routes/public.routes");
+const invitationsRouter = require("./src/routes/invitations.routes");
 
 const app = express();
 app.use(cors());
@@ -30,5 +31,5 @@ app.use("/sessions", sessionRoutes);
 app.use("/images", imageRoutes);
 app.use("/pairwise", pairwiseRoutes);
 app.use("/public", publicRoutes);
-
+app.use("/invitations", invitationsRouter);
 module.exports = app;
