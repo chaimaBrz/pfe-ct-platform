@@ -13,6 +13,7 @@ const pairwiseRoutes = require("./src/routes/pairwise.routes");
 const publicRoutes = require("./src/routes/public.routes");
 const invitationsRouter = require("./src/routes/invitations.routes");
 const adminResultsRoutes = require("./src/routes/adminResults.routes");
+const adminStatsRoutes = require("./src/routes/adminStats.routes");
 
 const app = express();
 app.use(cors());
@@ -34,5 +35,6 @@ app.use("/pairwise", pairwiseRoutes);
 app.use("/public", publicRoutes);
 app.use("/invitations", invitationsRouter);
 app.use(adminResultsRoutes);
+app.use(adminStatsRoutes);
 
 module.exports = app;

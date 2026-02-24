@@ -293,3 +293,46 @@
 .table-button:hover {
   background: rgba(191, 219, 254, 0.9);
 }
+.admin-upload {
+  margin-top: 25px;
+  padding: 18px;
+  border-radius: 18px;
+  background: rgba(219, 234, 254, 0.35);
+  border: 1px solid rgba(147, 197, 253, 0.35);
+}
+
+.admin-upload h3 {
+  margin-bottom: 12px;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #1e3a8a;
+}
+
+.admin-file-input {
+  width: 100%;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px dashed rgba(59, 130, 246, 0.5);
+  background: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+}
+
+.admin-upload-button {
+  margin-top: 12px;
+  width: 100%;
+  padding: 12px;
+  border-radius: 14px;
+  border: none;
+  font-weight: 800;
+  cursor: pointer;
+
+  background: linear-gradient(135deg, #3b82f6, #22d3ee);
+  color: white;
+
+  transition: 0.2s;
+}
+
+.admin-upload-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(59, 130, 246, 0.25);
+}

@@ -7,6 +7,7 @@ export default function CreateStudy() {
   const [protocolId, setProtocolId] = useState("");
   const [msg, setMsg] = useState("");
   const [createdStudy, setCreatedStudy] = useState(null);
+  const [images, setImages] = useState([]);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -18,13 +19,14 @@ export default function CreateStudy() {
       .then((data) => {
         if (Array.isArray(data)) {
           setProtocols(data);
+
           const first = data.find((p) => p.mode === mode);
           if (first) setProtocolId(first.id);
         }
       });
   }, []);
 
-  const selectedProtocol = protocols.find((p) => p.mode === mode)?.id || "";
+  const filteredProtocols = protocols.filter((p) => p.mode === mode);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -54,10 +56,41 @@ export default function CreateStudy() {
     }
 
     setCreatedStudy(data);
-    setMsg("✅ Study created in DB");
+    setMsg("✅ Study created");
   }
 
-  const filteredProtocols = protocols.filter((p) => p.mode === mode);
+  async function uploadImages() {
+    if (!images.length || !createdStudy) return;
+
+    const token = localStorage.getItem("token");
+
+    const formData = new FormData();
+
+    for (let file of images) {
+      formData.append("images", file);
+    }
+
+    const res = await fetch(
+      `http://localhost:4000/images/upload/${createdStudy.id}`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      },
+    );
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      setMsg(data.error || "Upload failed");
+      return;
+    }
+
+    setMsg("✅ Images uploaded");
+    setImages([]);
+  }
 
   return (
     <div className="admin-page">
@@ -88,7 +121,7 @@ export default function CreateStudy() {
           >
             {filteredProtocols.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name} ({p.mode})
+                {p.name}
               </option>
             ))}
           </select>
@@ -99,13 +132,40 @@ export default function CreateStudy() {
         {msg && <div className="admin-message">{msg}</div>}
 
         {createdStudy && (
-          <div className="admin-message">
+          <div className="admin-message success">
             <div>
               <b>Study ID:</b> {createdStudy.id}
             </div>
             <div>
               <b>Status:</b> {createdStudy.status}
             </div>
+          </div>
+        )}
+
+        {createdStudy && (
+          <div className="admin-upload">
+            <h3>Add Study Images</h3>
+
+            <input
+              type="file"
+              multiple
+              className="admin-file-input"
+              onChange={(e) => setImages([...e.target.files])}
+            />
+
+            <button
+              type="button"
+              className="admin-upload-button"
+              onClick={uploadImages}
+            >
+              Upload Images
+            </button>
+
+            {images.length > 0 && (
+              <div className="admin-message">
+                {images.length} images selected
+              </div>
+            )}
           </div>
         )}
       </div>

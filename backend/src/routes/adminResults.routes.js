@@ -18,7 +18,7 @@ router.get(
         where: { studyId },
         include: {
           invitation: true,
-          evaluations: true,
+          pairwiseEvaluations: true,
           visionTests: true,
         },
         orderBy: { startedAt: "desc" },
@@ -33,7 +33,7 @@ router.get(
           id: s.id,
           token: s.invitation?.token,
           startedAt: s.startedAt,
-          evaluationsCount: s.evaluations.length,
+          evaluationsCount: s.pairwiseEvaluations.length,
           ishiharaScore: ishihara?.score ?? "-",
           contrastScore: contrast?.score ?? "-",
         };
