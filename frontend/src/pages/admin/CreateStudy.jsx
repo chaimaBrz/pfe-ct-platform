@@ -19,12 +19,16 @@ export default function CreateStudy() {
       .then((data) => {
         if (Array.isArray(data)) {
           setProtocols(data);
-
-          const first = data.find((p) => p.mode === mode);
-          if (first) setProtocolId(first.id);
         }
       });
   }, []);
+
+  useEffect(() => {
+    const first = protocols.find((p) => p.mode === mode);
+    if (first) {
+      setProtocolId(first.id);
+    }
+  }, [mode, protocols]);
 
   const filteredProtocols = protocols.filter((p) => p.mode === mode);
 
@@ -56,11 +60,14 @@ export default function CreateStudy() {
     }
 
     setCreatedStudy(data);
-    setMsg("✅ Study created");
+    setMsg("Study created");
   }
 
   async function uploadImages() {
-    if (!images.length || !createdStudy) return;
+    if (!images.length || !createdStudy) {
+      setMsg("Select images first");
+      return;
+    }
 
     const token = localStorage.getItem("token");
 
@@ -70,26 +77,33 @@ export default function CreateStudy() {
       formData.append("images", file);
     }
 
-    const res = await fetch(
-      `http://localhost:4000/images/upload/${createdStudy.id}`,
-      {
+    formData.append("studyId", createdStudy.id);
+
+    try {
+      const res = await fetch("http://localhost:4000/images/upload", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
         },
         body: formData,
-      },
-    );
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (!res.ok) {
-      setMsg(data.error || "Upload failed");
-      return;
+      if (!res.ok) {
+        setMsg(data.error || "Upload failed");
+        return;
+      }
+
+      setMsg("Images uploaded successfully");
+      setImages([]);
+
+      const input = document.querySelector(".admin-file-input");
+      if (input) input.value = "";
+    } catch (err) {
+      setMsg("Upload error");
+      console.error(err);
     }
-
-    setMsg("✅ Images uploaded");
-    setImages([]);
   }
 
   return (

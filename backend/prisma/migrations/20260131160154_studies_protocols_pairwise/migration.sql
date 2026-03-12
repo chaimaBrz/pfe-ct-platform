@@ -27,7 +27,7 @@ CREATE TABLE "Study" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "studyType" "StudyType" NOT NULL,
-    "status" TEXT NOT NULL DEFAULT 'DRAFT',
+
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "protocolId" TEXT NOT NULL,
 

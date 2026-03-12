@@ -62,7 +62,6 @@ model Study {
   id            String   @id @default(uuid())
   name          String
   studyType     StudyType
-  status        String   @default("DRAFT")
   createdAt     DateTime @default(now())
 
   protocolId String

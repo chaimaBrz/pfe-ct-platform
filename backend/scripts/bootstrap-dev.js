@@ -17,7 +17,9 @@ const prisma = require("../src/db/prisma");
   }
 
   // Protocol + Study (minimum)
-  let protocol = await prisma.protocol.findFirst({ where: { name: "Pairwise v1" } });
+  let protocol = await prisma.protocol.findFirst({
+    where: { name: "Pairwise v1" },
+  });
   if (!protocol) {
     protocol = await prisma.protocol.create({
       data: {
@@ -35,7 +37,6 @@ const prisma = require("../src/db/prisma");
       data: {
         name: "Demo Study",
         studyType: "QUALITY",
-        status: "RUNNING",
         protocolId: protocol.id,
       },
     });
@@ -76,6 +77,8 @@ const prisma = require("../src/db/prisma");
   process.exit(0);
 })().catch(async (e) => {
   console.error(e);
-  try { await prisma.$disconnect(); } catch (_) {}
+  try {
+    await prisma.$disconnect();
+  } catch (_) {}
   process.exit(1);
 });

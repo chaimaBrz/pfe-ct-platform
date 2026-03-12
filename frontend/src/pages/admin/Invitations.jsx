@@ -54,11 +54,15 @@ export default function Invitations() {
             value={studyId}
             onChange={(e) => setStudyId(e.target.value)}
           >
-            {studies.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name} ({s.protocol?.mode})
-              </option>
-            ))}
+            {studies.map((s) => {
+              const mode = s.protocol?.mode || s.mode || "UNKNOWN";
+
+              return (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({mode})
+                </option>
+              );
+            })}
           </select>
 
           <button className="admin-button">Generate Invitation</button>

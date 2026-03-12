@@ -1,60 +1,110 @@
 const prisma = require("../db/prisma");
 const axios = require("axios");
-const FormData = require("form-data");
 
-/* ✅ UPLOAD → ORTHANC */
+/* ===============================
+   UPLOAD IMAGES TO ORTHANC
+================================ */
 
 exports.uploadImages = async (req, res) => {
   try {
     const files = req.files;
+    const studyId = req.body.studyId;
 
-    if (!files?.length) {
-      return res.status(400).json({ error: "No files received" });
+    if (!files || files.length === 0) {
+      return res.status(400).json({ error: "No files uploaded" });
+    }
+
+    if (!studyId) {
+      return res.status(400).json({ error: "Missing studyId" });
     }
 
     const createdAssets = [];
 
     for (const file of files) {
-      /* ✅ Send file → Orthanc */
-      const response = await axios.post(
+      const upload = await axios.post(
         "http://localhost:8042/instances",
         file.buffer,
         {
           headers: {
             "Content-Type": "application/dicom",
           },
+          auth: {
+            username: "admin",
+            password: "admin",
+          },
         },
       );
 
-      const orthancId = response.data.ID;
+      console.log("ORTHANC RESPONSE:", upload.data);
 
-      /* ✅ Save reference → Prisma */
+      const orthancId = upload.data.ID;
+
+      if (!orthancId) {
+        throw new Error("Orthanc did not return instance ID");
+      }
+
+      const meta = await axios.get(
+        `http://localhost:8042/instances/${orthancId}/simplified-tags`,
+        {
+          auth: {
+            username: "admin",
+            password: "admin",
+          },
+        },
+      );
+
+      const tags = meta.data;
+
       const asset = await prisma.imageAsset.create({
         data: {
-          filename: file.originalname,
-          orthancId: orthancId,
-          modality: "CT",
+          label: file.originalname,
+          format: "DICOM",
+          uri: orthancId,
+          studyInstanceUID: tags.StudyInstanceUID || null,
+          seriesInstanceUID: tags.SeriesInstanceUID || null,
+          sopInstanceUID: tags.SOPInstanceUID || null,
+          metadataJson: tags,
+        },
+      });
+
+      await prisma.studyImage.create({
+        data: {
+          studyId: studyId,
+          imageId: asset.id,
         },
       });
 
       createdAssets.push(asset);
     }
 
-    res.json(createdAssets);
-  } catch (e) {
-    console.error("UPLOAD ERROR:", e.message);
-    res.status(500).json({ error: "Orthanc upload failed" });
+    return res.json({
+      message: "Images uploaded",
+      images: createdAssets,
+    });
+  } catch (error) {
+    console.error("UPLOAD ERROR:", error);
+
+    return res.status(500).json({
+      error: "Upload failed",
+    });
   }
 };
-/* ✅ CREATE IMAGE ASSET (manual) */
+
+/* ===============================
+   CREATE IMAGE (NOT USED)
+================================ */
+
 exports.create = async (req, res) => {
-  return res.json({ ok: true });
+  res.json({ ok: true });
 };
 
-/* ✅ LIST IMAGE ASSETS */
+/* ===============================
+   LIST IMAGES
+================================ */
+
 exports.list = async (req, res) => {
   const items = await prisma.imageAsset.findMany({
-    orderBy: { uploadedAt: "desc" },
+    orderBy: { createdAt: "desc" },
     take: 50,
   });
 

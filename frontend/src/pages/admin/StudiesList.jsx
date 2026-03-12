@@ -30,7 +30,6 @@ export default function StudiesList() {
           <thead>
             <tr>
               <th>Name</th>
-              <th>Status</th>
               <th>Type</th>
               <th>Protocol</th>
             </tr>
@@ -40,7 +39,6 @@ export default function StudiesList() {
             {studies.map((s) => (
               <tr key={s.id}>
                 <td>{s.name}</td>
-                <td>{s.status}</td>
                 <td>{s.studyType}</td>
                 <td>{s.protocol?.mode}</td>
               </tr>
